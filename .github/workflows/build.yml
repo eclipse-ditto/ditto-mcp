@@ -1,0 +1,55 @@
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Eclipse Public License 2.0 which is available at
+# http://www.eclipse.org/legal/epl-2.0
+#
+# SPDX-License-Identifier: EPL-2.0
+name: build
+
+on:
+  push:
+    branches:
+      - main
+
+  # Run build for any PR
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to a PR cancels that PR's running build; a build on main is never cancelled mid-run
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Install npm dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Run tests
+        run: npm test
+      # Starts pgvector/pgvector:pg16 through Testcontainers on the runner's Docker
+      - name: Run Postgres tests
+        run: npm run test:pg
