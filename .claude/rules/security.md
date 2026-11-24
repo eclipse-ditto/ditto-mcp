@@ -14,7 +14,8 @@ The server holds powerful credentials. `ditto.devopsCredential` reaches `/devops
 
 ## Identity
 - Ditto sees only the server's own identity: `ditto.credential` for ordinary operations, and `ditto.devopsCredential`, **exclusively**, for sudo operations. A sudo operation without a devops credential is refused at the MCP layer (`operationToTool`). It is never retried with the standard credential.
-- Caller headers never pick the credential, replace it, or reach Ditto. `RequestCtx.headers` is informational only, and `HttpDittoClient` builds its headers solely from the `DittoCredential`.
+- Caller headers never pick the credential, replace it, or reach Ditto. `RequestCtx.headers` is informational only. `HttpDittoClient` builds its headers from the spec-declared header params of the operation (tool arguments, e.g. Ditto's `ce-*`), then the `DittoCredential` and the declared content type, which always win.
+- Header params: `isReservedHeader` (`openapi.ts`) keeps `authorization`, `proxy-authorization`, `cookie`, `host`, `content-type`, `content-length`, `transfer-encoding`, and `connection` out of the parsed params, and the client skips them again; a value with CR or LF is refused. Never accept a header name from a tool argument or a caller, only from the spec.
 - The HTTP bearer token authenticates the caller to this server, nothing more. `bearerAuthMiddleware` strips `authorization` from both `req.headers` and `req.rawHeaders` (the SDK reads `rawHeaders` through Hono), so tool handlers never see it.
 - This design is deliberate: credential pass-through was removed. Don't bring forwarding back without an explicit decision from the maintainers. Per-user OIDC is planned as a separate tier.
 

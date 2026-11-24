@@ -59,11 +59,11 @@ bin/ingest.ts
 | `server/http-app.ts` | `createHttpApp()`: Express `/mcp` POST/GET/DELETE, bearer gate, loopback fail-closed check, Host allowlist, session routing |
 | `server/session-table.ts` | `SessionTable`: session cap, idle sweep, two-phase reserve/add admission, eviction |
 | `bin/stdio.ts`, `bin/http.ts`, `bin/ingest.ts` | Entrypoints: `main().catch` prints `fatal:` and exits 1 |
-| `ditto/openapi.ts` | `parseOperations(spec)` returns `DittoOperation[]`: `$ref` resolution, params, body media type, body schema, `MERGE_PATCH`, `mediaType()` |
+| `ditto/openapi.ts` | `parseOperations(spec)` returns `DittoOperation[]`: `$ref` resolution, path/query/header params, `isReservedHeader()`, body media type, body schema, `MERGE_PATCH`, `mediaType()` |
 | `ditto/tool-policy.ts` | `isSudo(op)`, `isAllowed(op, policy)` |
 | `ditto/action-tool.ts` | `toolName()` (`ditto_` prefix, 64-char cap + hash), zod input schema, `operationToTool()` (picks the credential) |
 | `ditto/action-tools.ts` | `makeActionTools()`: spec resolution, credentials, policy filter, name de-dup; `BUNDLED_SPEC_PATH` |
-| `ditto/client.ts` | `HttpDittoClient.execute()`: builds the URL, guards path params, encodes the body |
+| `ditto/client.ts` | `HttpDittoClient.execute()`: builds the URL and headers, guards path and header params, encodes the body |
 | `ditto/credential.ts` | `DittoCredential`, `createConfigCredential()`, `OidcClientCredential` (client-credentials grant, token cache, shared fetch) |
 | `ditto/fake-ditto.ts`, `ditto/fake-oidc.ts` | Test-only HTTP fakes |
 | `knowledge/types.ts` | `Chunk`, `RetrievedChunk`, `KnowledgeSource`, `Retriever`, `SkipFn`, `SkippedItem` |

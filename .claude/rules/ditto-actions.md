@@ -20,7 +20,7 @@ Security constraints for this code live in `security.md`. This file covers how i
 7. De-duplicates names: a collision gets the first free `_2`, `_3`, … suffix that fits in 64 chars and isn't held by any other action tool.
 
 ## Parsing (`openapi.ts`)
-- Methods: get, put, post, delete, patch. Parameters: only `path` and `query`. Path-item parameters are merged in, with the operation's own winning on a name clash. Path parameters are always required.
+- Methods: get, put, post, delete, patch. Parameters: `path`, `query`, and `header` (except the names `isReservedHeader` refuses; see `security.md`). Cookie params are ignored. Path-item parameters are merged in, with the operation's own winning on a name clash. Path parameters are always required.
 - One level of `$ref` is resolved, for `components/parameters`, `components/requestBodies`, and `components/schemas`.
 - Ditto's spec declares **no operationIds**. Each operation gets a synthesized id, `"<METHOD>_<path>"`, which `toolName` recognizes.
 - Body media type (`bodyMediaOf`): `application/json` if the operation declares it, otherwise the first concrete type; if only a wildcard is declared, send JSON. Compare types with `mediaType()` (drops parameters, lowercases). Ditto rejects a type the route doesn't declare: its PATCH routes accept only `application/merge-patch+json`.
@@ -35,7 +35,7 @@ The name is `ditto_` plus a sanitized id: only `[A-Za-z0-9_]`, with runs of `_` 
 An allowlist entry is either an operationId or `"METHOD /raw/spec/{path}"`, with the braces kept. Since Ditto's spec has no operationIds, use the `METHOD path` form.
 
 ## Client (`client.ts`)
-- The URL is the stripped `baseUrl`, plus the path with its parameters substituted, plus a query string of the params that have values.
+- The URL is the stripped `baseUrl`, plus the path with its parameters substituted, plus a query string of the params that have values. Header params with a value become lowercased request headers, set before the credential and content type.
 - `encodePathParam` substitutes a path param: `*Path` params (paths inside an entity) keep their `/` and encode each segment; every other param is one encoded segment. The guard rules are in `security.md`.
 - A body is sent only when `op.hasBody` and `args.body !== undefined`. `encodeBody` encodes it by media type: JSON and `+json` types with `JSON.stringify`, a form-urlencoded object with `URLSearchParams`, a string as-is.
 - `execute` returns `{ status, body }`, and the tool answers with the text `HTTP <status>\n<body>`. A non-2xx status is a result, not an exception.

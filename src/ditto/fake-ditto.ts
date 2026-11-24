@@ -11,9 +11,9 @@
  * SPDX-License-Identifier: EPL-2.0
  */
 
-import { createServer, type Server } from "node:http";
+import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 
-export interface RecordedRequest { method: string; url: string; auth?: string; contentType?: string; body?: string }
+export interface RecordedRequest { method: string; url: string; auth?: string; contentType?: string; body?: string; headers: IncomingHttpHeaders }
 export interface FakeReply { status: number; body: string }
 
 export async function startFakeDitto(
@@ -30,6 +30,7 @@ export async function startFakeDitto(
         auth: req.headers["authorization"] as string | undefined,
         contentType: req.headers["content-type"],
         body: chunks.length ? Buffer.concat(chunks).toString("utf8") : undefined,
+        headers: req.headers,
       };
       requests.push(rec);
       const reply = handler(rec);

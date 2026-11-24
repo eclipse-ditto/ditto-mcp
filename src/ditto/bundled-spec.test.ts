@@ -91,6 +91,13 @@ describe("bundled Ditto spec", () => {
     expect([...literal].sort()).toEqual(["attributePath", "propertyPath", "resourcePath"]);
   });
 
+  it("exposes the CloudEvents ce-* headers Ditto requires as parameters of POST /api/2/cloudevents", () => {
+    const ops = parseOperations(YAML.parse(readFileSync(specPath, "utf8")));
+    const ce = ops.find((o) => o.method === "POST" && o.path === "/api/2/cloudevents");
+    const headers = ce!.params.filter((p) => p.in === "header" && p.required).map((p) => p.name).sort();
+    expect(headers).toEqual(expect.arrayContaining(["ce-id", "ce-source", "ce-specversion", "ce-type"]));
+  });
+
   it("sends a search POST form-encoded", () => {
     const spec = YAML.parse(readFileSync(specPath, "utf8"));
     const search = parseOperations(spec).find((o) => o.method === "POST" && o.path === "/api/2/search/things");

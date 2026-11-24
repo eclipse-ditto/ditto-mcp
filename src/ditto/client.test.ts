@@ -123,6 +123,45 @@ describe("HttpDittoClient", () => {
     expect(fake.requests[0].body).toBe("connectivity.commands:openConnection");
   });
 
+  it("sends header params as request headers and leaves out the ones without a value", async () => {
+    fake = await startFakeDitto(() => ({ status: 202, body: "" }));
+    const cloudevent = op({ method: "POST", path: "/cloudevents", hasBody: true, contentType: "application/vnd.eclipse.ditto+json",
+      params: [
+        { name: "ce-id", in: "header", required: true, type: "string" },
+        { name: "ce-dataschema", in: "header", required: false, type: "string" }] });
+    await new HttpDittoClient(fake.baseUrl).execute(cloudevent, { "ce-id": "e2e-1", body: { topic: "t" } }, cred("Basic abc"));
+    const r = fake.requests[0];
+    expect(r.url).toBe("/cloudevents");
+    expect(r.headers["ce-id"]).toBe("e2e-1");
+    expect(r.headers).not.toHaveProperty("ce-dataschema");
+    expect(r.auth).toBe("Basic abc");
+    expect(r.contentType).toBe("application/vnd.eclipse.ditto+json");
+  });
+
+  it("never lets a header param replace the credential or the body's media type", async () => {
+    // The parser drops such names; this guards the client should one ever get through.
+    fake = await startFakeDitto(() => ({ status: 204, body: "" }));
+    const put = op({ method: "PUT", path: "/x", hasBody: true, contentType: "application/json", params: [
+      { name: "Authorization", in: "header", required: false, type: "string" },
+      { name: "Content-Type", in: "header", required: false, type: "string" }] });
+    const client = new HttpDittoClient(fake.baseUrl);
+    await client.execute(put, { Authorization: "Basic evil", "Content-Type": "text/plain", body: {} }, cred("Basic abc"));
+    expect(fake.requests[0].auth).toBe("Basic abc");
+    expect(fake.requests[0].contentType).toBe("application/json");
+    // Nothing to overwrite it with: no credential, no body. It must still not be sent.
+    await client.execute(put, { Authorization: "Basic evil", "Content-Type": "text/plain" }, cred());
+    expect(fake.requests[1].auth).toBeUndefined();
+    expect(fake.requests[1].contentType).toBeUndefined();
+  });
+
+  it("refuses a header param value with a line break", async () => {
+    fake = await startFakeDitto(() => ({ status: 202, body: "" }));
+    const withHeader = op({ method: "POST", path: "/x", params: [{ name: "ce-id", in: "header", required: true, type: "string" }] });
+    await expect(new HttpDittoClient(fake.baseUrl).execute(withHeader, { "ce-id": "1\r\nX-Evil: 1" }, cred()))
+      .rejects.toThrow(/header parameter ce-id/);
+    expect(fake.requests).toHaveLength(0);
+  });
+
   it("encodes unsafe path-param chars but keeps the Ditto namespace colon", async () => {
     fake = await startFakeDitto(() => ({ status: 200, body: "" }));
     const client = new HttpDittoClient(fake.baseUrl);

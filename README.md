@@ -440,7 +440,7 @@ Example:
 
 - Sudo operations use `devopsCredential` **exclusively**. If `devopsCredential` is not set, every sudo tool is refused at the MCP layer (even if `credential` could reach it).
 - `devopsCredential` may be `basic` (Ditto `DevOpsBasic`: a devops user's username/password) or `oidc` (Ditto `DevOpsBearer`: OAuth2). For a separate devops OIDC identity, give it its own `clientId`/`clientSecret`.
-- Callers cannot supply or override either credential. Any `Authorization` header a caller sends is ignored for Ditto calls.
+- Callers cannot supply or override either credential. Any `Authorization` header a caller sends is ignored for Ditto calls, and no tool argument can set `Authorization`, `Content-Type`, `Host`, `Cookie`, or the other framing headers (see header parameters under [Tools Exposed](#tools-exposed)).
 
 Example (separate OIDC identities):
 
@@ -516,6 +516,8 @@ A spec that does declare `operationId`s gets `ditto_<operationId>`. Names are ca
 Write tools (POST, PATCH, PUT) expose their top-level request body fields in the tool schema, allowing clients to discover and validate the shape of the request. Nested objects are passed through as freeform JSON.
 
 Path parameters are URL-encoded, keeping the `:` of Ditto ids. The three paths into an entity, `attributePath`, `propertyPath`, and `resourcePath`, keep their `/` separators, so `location/lat` and `thing:/features/lamp` (or the root resource `thing:/`) work as written. Any other parameter is a single segment, so a `/` in, say, a `thingId` is encoded. A value that is empty, is `.` or `..`, or contains such a segment (`a/../b`, `a//b`, a leading `/`) is refused before anything is sent to Ditto.
+
+Header parameters the spec declares are tool arguments too: the CloudEvents headers of `ditto_POST_cloudevents` (`ce-specversion`, `ce-id`, `ce-source`, `ce-type`, ...), and `If-Match`, `If-None-Match`, `if-equal` and the `*-metadata` headers on the things operations. Their names come only from the spec; a header the caller sends to the MCP endpoint is never forwarded. A spec header named `Authorization`, `Proxy-Authorization`, `Cookie`, `Host`, `Content-Type`, `Content-Length`, `Transfer-Encoding`, or `Connection` is never exposed, and a value containing a line break is refused.
 
 ## Security & OSS Notes
 

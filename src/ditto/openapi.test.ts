@@ -65,6 +65,24 @@ describe("parseOperations", () => {
     expect(search.params[0]).toEqual({ name: "filter", in: "query", required: false, type: "string" });
   });
 
+  it("parses header params, except names that would set the request's identity or framing", () => {
+    // Ditto's cloudevents route needs ce-* headers. A spec header named like the credential or the
+    // body's media type must never become a tool argument that replaces them.
+    const ops = parseOperations({ paths: { "/ce": { post: { parameters: [
+      { name: "ce-id", in: "header", required: true, schema: { type: "string" } },
+      { name: "If-Match", in: "header", schema: { type: "string" } },
+      { name: "Authorization", in: "header", schema: { type: "string" } },
+      { name: "content-type", in: "header", schema: { type: "string" } },
+      { name: "Host", in: "header", schema: { type: "string" } },
+      { name: "Cookie", in: "header", schema: { type: "string" } },
+      { name: "session", in: "cookie", schema: { type: "string" } },
+    ] } } } });
+    expect(ops[0].params).toEqual([
+      { name: "ce-id", in: "header", required: true, type: "string" },
+      { name: "If-Match", in: "header", required: false, type: "string" },
+    ]);
+  });
+
   it("synthesizes an operationId when missing", () => {
     const ops = parseOperations({ paths: { "/x": { get: {} } } });
     expect(ops[0].operationId).toBe("GET_/x");

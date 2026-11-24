@@ -13,7 +13,7 @@
 
 export interface OpParam {
   name: string;
-  in: "path" | "query";
+  in: "path" | "query" | "header";
   required: boolean;
   type: "string" | "number" | "boolean";
 }
@@ -75,6 +75,18 @@ type BodyContent = Record<string, { schema?: unknown }>;
 export const MERGE_PATCH = "application/merge-patch+json";
 
 /** "Application/JSON; charset=utf-8" -> "application/json". */
+// Header params come from the spec (Ditto's cloudevents route needs ce-*), never from the caller.
+// These names would let a tool argument replace the server's credential or the request framing,
+// so they are never parameters.
+const RESERVED_HEADERS = new Set([
+  "authorization", "proxy-authorization", "cookie", "host",
+  "content-type", "content-length", "transfer-encoding", "connection",
+]);
+
+export function isReservedHeader(name: string): boolean {
+  return RESERVED_HEADERS.has(name.toLowerCase());
+}
+
 export function mediaType(contentType: string): string {
   return contentType.split(";")[0].trim().toLowerCase();
 }
@@ -147,11 +159,11 @@ export function parseOperations(spec: unknown): DittoOperation[] {
       const opParams = (op.parameters ?? []).map((p) => resolveParam(s, p));
       const seen = new Set<string>();
       const params: OpParam[] = [...opParams, ...pathParams] // op-level wins on name clash
-        .filter((p) => p.in === "path" || p.in === "query")
+        .filter((p) => p.in === "path" || p.in === "query" || (p.in === "header" && !isReservedHeader(String(p.name))))
         .filter((p) => (seen.has(`${p.in}:${p.name}`) ? false : seen.add(`${p.in}:${p.name}`)))
         .map((p) => ({
           name: String(p.name),
-          in: p.in as "path" | "query",
+          in: p.in as OpParam["in"],
           required: p.required === true || p.in === "path",
           type: paramType(p.schema),
         }));

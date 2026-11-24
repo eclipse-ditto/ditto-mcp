@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: EPL-2.0
  */
 
-import { mediaType, type DittoOperation } from "./openapi.js";
+import { isReservedHeader, mediaType, type DittoOperation } from "./openapi.js";
 import type { DittoCredential } from "./credential.js";
 
 export interface DittoResponse {
@@ -48,18 +48,25 @@ export class HttpDittoClient implements DittoClient {
   ): Promise<DittoResponse> {
     let path = op.path;
     const query = new URLSearchParams();
+    const headers: Record<string, string> = {};
     for (const p of op.params) {
       const v = args[p.name];
       if (p.in === "path") {
         path = path.replace(`{${p.name}}`, encodePathParam(p.name, String(v ?? "")));
-      } else if (v !== undefined) {
+      } else if (v === undefined) {
+        continue;
+      } else if (p.in === "query") {
         query.set(p.name, String(v));
+      } else if (!isReservedHeader(p.name)) {
+        const value = String(v);
+        if (/[\r\n]/.test(value)) throw new Error(`header parameter ${p.name} must not contain a line break`);
+        headers[p.name.toLowerCase()] = value;
       }
     }
     const qs = query.toString();
     const url = `${this.baseUrl}${path}${qs ? `?${qs}` : ""}`;
 
-    const headers: Record<string, string> = {};
+    // Set after the params: the server's credential and the declared media type always win.
     const auth = await credential.authHeader(signal);
     if (auth) headers["authorization"] = auth;
     let body: string | undefined;
