@@ -48,6 +48,15 @@ describe("HybridRetriever", () => {
     expect(hits).toHaveLength(3);
   });
 
+  it("fuses a chunk that both retrievers rank just below the requested count", async () => {
+    // Fetching only k candidates per leg dropped 'x' (4th in both lists for k=3) before fusion,
+    // although RRF scores it 2/64, above any single-list first place (1/61).
+    const h = new HybridRetriever([fixed("fts", ["a", "b", "c", "x"]), fixed("vector", ["d", "e", "f", "x"])]);
+    const hits = await h.search("q", 3);
+    expect(hits.map((rc) => rc.chunk.id)).toEqual(["x", "a", "d"]);
+    expect(hits[0].matchedBy).toEqual(["fts", "vector"]);
+  });
+
   it("merges matchedBy from both retrievers for duplicates", async () => {
     // 'b' appears in both lists -> matchedBy should be ["fts","vector"]
     const a = fixed("fts", ["a", "b", "c"]);

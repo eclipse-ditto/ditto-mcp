@@ -284,7 +284,7 @@ The server exposes `search` and `get_chunk` tools backed by a pluggable knowledg
 Choose a retriever mode:
 - `fts` (default) — fast keyword search, no model download, works offline
 - `vector` — semantic vector search (downloads BGE embedding model ~80MB on first run)
-- `hybrid` — RRF fusion of FTS + vector (best recall)
+- `hybrid` — RRF fusion of FTS + vector (best recall). Each side contributes `max(2 × limit, 20)` candidates before fusion, so a chunk both rank moderately can still beat a chunk only one of them ranks first; `search` still returns `limit` results
 
 The index can be stored in **SQLite** (file-based, default) or **Postgres** (pgvector + FTS).
 

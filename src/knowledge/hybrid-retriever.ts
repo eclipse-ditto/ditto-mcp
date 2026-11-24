@@ -21,8 +21,12 @@ export class HybridRetriever implements Retriever {
   constructor(private readonly retrievers: Retriever[]) {}
 
   async search(query: string, k: number): Promise<RetrievedChunk[]> {
+    // Fuse deeper lists than we return: a chunk both legs rank just below k outscores any
+    // single-leg first place, but only if it was fetched. 2k stays within pgvector's default
+    // hnsw.ef_search (40) for the maximum k of 20; an HNSW scan returns at most ef_search rows.
+    const depth = Math.max(2 * k, 20);
     const lists = await Promise.all(
-      this.retrievers.map((r) => r.search(query, k)),
+      this.retrievers.map((r) => r.search(query, depth)),
     );
     const scores = new Map<string, number>();
     const byId = new Map<string, Chunk>();

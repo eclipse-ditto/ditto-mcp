@@ -10,7 +10,7 @@ paths:
 ## Abstractions (`types.ts`, `knowledge-store.ts`)
 - A `KnowledgeSource` yields `Chunk[]` through `loadChunks(signal, onSkip)` and never searches. It reports a recoverable per-item failure with `onSkip(item, reason)`, and throws when the whole source fails.
 - A `KnowledgeStore` is backend-agnostic: it holds chunks, an FTS index, optional vectors, and `IndexMeta`. There are two implementations, `SqliteKnowledgeStore` and `PgKnowledgeStore`. A new method needs both implementations, with tests in both suites.
-- `Retriever.search(query, k)` returns `RetrievedChunk[]`, with `matchedBy` naming the leaf retrievers that matched. The retrievers are `FtsRetriever`, `VectorRetriever`, and `HybridRetriever` (RRF with k=60, ties broken by id).
+- `Retriever.search(query, k)` returns `RetrievedChunk[]`, with `matchedBy` naming the leaf retrievers that matched. The retrievers are `FtsRetriever`, `VectorRetriever`, and `HybridRetriever` (RRF with k=60, ties broken by id; it asks each leg for `max(2k, 20)` candidates and returns k, which keeps the depth within pgvector's default `hnsw.ef_search` of 40 for the maximum k of 20).
 - `KnowledgeService` combines a retriever, the store, and an optional `beforeSearch` guard, and adds neighbor expansion.
 - `tools/knowledge.ts` formats the output. The `search` tool's `limit` (max 20) and `context` (max 5) arguments default to the values in `knowledge.search`.
 
