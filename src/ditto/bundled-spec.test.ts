@@ -69,6 +69,28 @@ describe("bundled Ditto spec", () => {
     expect(names.filter((n) => n.length > 64)).toEqual([]);
   });
 
+  it("sends a '/' literally only in the entity-path params, each the last segment of its route", async () => {
+    // A "/" sent literally in any other param ("ns:a/attributes" as a thingId) would retarget
+    // the request to an operation the policy may not expose.
+    const ops = parseOperations(YAML.parse(readFileSync(specPath, "utf8")));
+    let url = "";
+    const fetchFn = (async (u: string | URL | Request) => { url = String(u); return new Response(""); }) as typeof fetch;
+    const client = new HttpDittoClient("http://ditto", fetchFn);
+    const literal = new Set<string>();
+    for (const op of ops) {
+      const pathParams = op.params.filter((p) => p.in === "path");
+      for (const p of pathParams) {
+        const args = Object.fromEntries(pathParams.map((q) => [q.name, q === p ? "x/y" : "v"]));
+        await client.execute(op, args, { authHeader: async () => undefined });
+        if (url.includes("x/y")) {
+          literal.add(p.name);
+          expect(op.path.endsWith(`{${p.name}}`), op.path).toBe(true);
+        }
+      }
+    }
+    expect([...literal].sort()).toEqual(["attributePath", "propertyPath", "resourcePath"]);
+  });
+
   it("sends a search POST form-encoded", () => {
     const spec = YAML.parse(readFileSync(specPath, "utf8"));
     const search = parseOperations(spec).find((o) => o.method === "POST" && o.path === "/api/2/search/things");

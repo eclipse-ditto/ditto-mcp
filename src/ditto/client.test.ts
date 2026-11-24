@@ -134,6 +134,43 @@ describe("HttpDittoClient", () => {
     expect(fake.requests[0].url).toBe("/things/ns:a%20b%2Fc"); // colon kept; space+slash encoded
   });
 
+  it("sends the slashes of a multi-segment path param literally, encoding each segment", async () => {
+    // Ditto's policies route does not decode %2F: "thing:%2Ffeatures%2Flamp" missed the resource
+    // on GET/DELETE, and PUT created a bogus "thing:/%2Ffeatures%2Flamp" entry that matched nothing.
+    fake = await startFakeDitto(() => ({ status: 200, body: "" }));
+    const client = new HttpDittoClient(fake.baseUrl);
+    const resource = op({ path: "/policies/{policyId}/entries/{label}/resources/{resourcePath}", params: [
+      { name: "policyId", in: "path", required: true, type: "string" },
+      { name: "label", in: "path", required: true, type: "string" },
+      { name: "resourcePath", in: "path", required: true, type: "string" }] });
+    const attribute = op({ path: "/things/{thingId}/attributes/{attributePath}", params: [
+      { name: "thingId", in: "path", required: true, type: "string" },
+      { name: "attributePath", in: "path", required: true, type: "string" }] });
+    await client.execute(resource, { policyId: "ns:p", label: "E", resourcePath: "thing:/features/lamp" }, cred());
+    await client.execute(resource, { policyId: "ns:p", label: "E", resourcePath: "thing:/" }, cred());
+    await client.execute(attribute, { thingId: "ns:1", attributePath: "location/a b?" }, cred());
+    expect(fake.requests.map((r) => r.url)).toEqual([
+      "/policies/ns:p/entries/E/resources/thing:/features/lamp",
+      "/policies/ns:p/entries/E/resources/thing:/",
+      "/things/ns:1/attributes/location/a%20b%3F",
+    ]);
+  });
+
+  it("refuses dot or empty segments inside a multi-segment path param", async () => {
+    // Once a param is split on "/", each piece is a URL segment of its own: "a/../.." would climb
+    // out of the attributes subtree, and an empty piece can name the parent collection.
+    fake = await startFakeDitto(() => ({ status: 204, body: "" }));
+    const client = new HttpDittoClient(fake.baseUrl);
+    const deleteAttribute = op({ method: "DELETE", path: "/things/{thingId}/attributes/{attributePath}", params: [
+      { name: "thingId", in: "path", required: true, type: "string" },
+      { name: "attributePath", in: "path", required: true, type: "string" }] });
+    for (const attributePath of ["a/../..", "a/./b", "a/..", "a//b", "/a", "/", "//"]) {
+      await expect(client.execute(deleteAttribute, { thingId: "ns:1", attributePath }, cred()))
+        .rejects.toThrow(/path parameter attributePath/);
+    }
+    expect(fake.requests).toHaveLength(0);
+  });
+
   it("refuses dot-segment path params, which would retarget the request to another endpoint", async () => {
     fake = await startFakeDitto(() => ({ status: 204, body: "" }));
     const client = new HttpDittoClient(fake.baseUrl);

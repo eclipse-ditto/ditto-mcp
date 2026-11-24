@@ -51,18 +51,7 @@ export class HttpDittoClient implements DittoClient {
     for (const p of op.params) {
       const v = args[p.name];
       if (p.in === "path") {
-        const value = String(v ?? "");
-        // A segment must not retarget the request to an operation the ToolPolicy never exposed.
-        // encodeURIComponent leaves dots alone and URL parsing resolves "." and "..":
-        // DELETE .../features/{featureId} with ".." would reach DELETE .../things/{thingId}.
-        // An empty segment names the parent collection: PUT .../attributes/{attributePath}
-        // with "" would replace every attribute.
-        // If multi-segment params are ever split on "/" instead of encoded whole, apply this
-        // check to every piece, or "a/../b" brings the problem back.
-        if (value === "" || value === "." || value === "..") {
-          throw new Error(`path parameter ${p.name} must not be ${value === "" ? "empty" : `"${value}"`}`);
-        }
-        path = path.replace(`{${p.name}}`, encodeURIComponent(value).replace(/%3A/g, ":"));
+        path = path.replace(`{${p.name}}`, encodePathParam(p.name, String(v ?? "")));
       } else if (v !== undefined) {
         query.set(p.name, String(v));
       }
@@ -83,6 +72,31 @@ export class HttpDittoClient implements DittoClient {
     const res = await this.fetchFn(url, { method: op.method, headers, body, signal });
     return { status: res.status, body: await res.text() };
   }
+}
+
+// attributePath, propertyPath and resourcePath are paths inside an entity, and Ditto must see their
+// slashes as slashes: its policies route does not decode %2F, so "thing:%2Ffeatures%2Flamp" names
+// no resource, and a PUT of it creates a bogus entry that matches nothing. Every other param stays
+// one encoded segment, so a "/" in a thingId cannot reach another operation.
+const MULTI_SEGMENT_PARAM = /Path$/;
+
+function encodePathParam(name: string, value: string): string {
+  const multi = MULTI_SEGMENT_PARAM.test(name);
+  // One trailing "/" is harmless and needed: "thing:/" is the root resource.
+  const pieces = multi ? value.replace(/\/$/, "").split("/") : [value];
+  for (const piece of pieces) {
+    // A segment must not retarget the request to an operation the ToolPolicy never exposed.
+    // encodeURIComponent leaves dots alone and URL parsing resolves "." and "..":
+    // DELETE .../features/{featureId} with ".." would reach DELETE .../things/{thingId}.
+    // An empty segment names the parent collection: PUT .../attributes/{attributePath}
+    // with "" would replace every attribute.
+    if (piece === "" || piece === "." || piece === "..") {
+      const what = piece === "" ? "empty" : `"${piece}"`;
+      throw new Error(`path parameter ${name} must not ${pieces.length > 1 ? "contain a segment that is" : "be"} ${what}`);
+    }
+  }
+  const encode = (s: string) => encodeURIComponent(s).replace(/%3A/g, ":");
+  return multi ? value.split("/").map(encode).join("/") : encode(value);
 }
 
 function encodeBody(value: unknown, contentType: string): string {

@@ -515,6 +515,8 @@ A spec that does declare `operationId`s gets `ditto_<operationId>`. Names are ca
 
 Write tools (POST, PATCH, PUT) expose their top-level request body fields in the tool schema, allowing clients to discover and validate the shape of the request. Nested objects are passed through as freeform JSON.
 
+Path parameters are URL-encoded, keeping the `:` of Ditto ids. The three paths into an entity, `attributePath`, `propertyPath`, and `resourcePath`, keep their `/` separators, so `location/lat` and `thing:/features/lamp` (or the root resource `thing:/`) work as written. Any other parameter is a single segment, so a `/` in, say, a `thingId` is encoded. A value that is empty, is `.` or `..`, or contains such a segment (`a/../b`, `a//b`, a leading `/`) is refused before anything is sent to Ditto.
+
 ## Security & OSS Notes
 
 **Commit the engine, NOT your corpus/built index/secrets:**

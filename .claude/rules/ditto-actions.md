@@ -36,6 +36,7 @@ An allowlist entry is either an operationId or `"METHOD /raw/spec/{path}"`, with
 
 ## Client (`client.ts`)
 - The URL is the stripped `baseUrl`, plus the path with its parameters substituted, plus a query string of the params that have values.
+- `encodePathParam` substitutes a path param: `*Path` params (paths inside an entity) keep their `/` and encode each segment; every other param is one encoded segment. The guard rules are in `security.md`.
 - A body is sent only when `op.hasBody` and `args.body !== undefined`. `encodeBody` encodes it by media type: JSON and `+json` types with `JSON.stringify`, a form-urlencoded object with `URLSearchParams`, a string as-is.
 - `execute` returns `{ status, body }`, and the tool answers with the text `HTTP <status>\n<body>`. A non-2xx status is a result, not an exception.
 
