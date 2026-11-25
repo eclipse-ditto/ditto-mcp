@@ -57,6 +57,8 @@ export const AppConfigSchema = z
             sessionIdleTimeoutMs: z.number().int().positive().default(30 * 60_000),
             sessionEvictionMinIdleMs: z.number().int().min(0).default(5 * 60_000),
             maxSessions: z.number().int().positive().default(100),
+            // The MCP SDK's own limit when it parses a message itself.
+            maxRequestBytes: z.number().int().positive().default(4 * 1024 * 1024),
             auth: HttpAuthSchema,
           })
           .default({}),

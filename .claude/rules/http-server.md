@@ -27,6 +27,7 @@ paths:
 6. GET (the event stream) and DELETE go to an existing session, or get 404 for an unknown id, or 400 without one.
 - `track` counts every request on a session: `openRequests` goes up and comes back down when `res` closes. A session with an open request is busy.
 - On errors: log `[ditto-mcp] <METHOD> /mcp error: ...` to stderr, and reply with JSON-RPC `-32603 "Internal error"` if no headers have been sent yet.
+- `express.json` takes `server.http.maxRequestBytes` (default 4 MiB, the SDK's own limit; Ditto accepts things and policies up to 100 kB and messages up to 250 kB). The error middleware, registered last, turns body-parser errors into JSON-RPC: too large is 413 / `-32600`, malformed JSON is 400 / `-32700`, another 4xx keeps its status with `-32600`, anything else is logged and gets 500 / `-32603`. Every reply from `/mcp` is JSON-RPC, never Express's HTML error page.
 
 ## SessionTable invariants (`session-table.ts`)
 - sessions − doomed + pending ≤ `maxSessions` at all times, even with concurrent initializes.

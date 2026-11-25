@@ -354,6 +354,48 @@ describe("session lifetime", () => {
   });
 });
 
+describe("request bodies", () => {
+  const initializeWith = (pad: string) => JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: {
+      protocolVersion: "2024-11-05",
+      capabilities: { experimental: { pad: { data: pad } } },
+      clientInfo: { name: "test", version: "1.0" },
+    },
+  });
+
+  it("accepts a body over express.json's 100 kB default", async () => {
+    // Ditto accepts things and policies up to 100 kB and messages up to 250 kB; a tool call
+    // carrying one, plus the JSON-RPC envelope, got an HTML 413.
+    const { server, url } = await listen();
+    const res = await fetch(url, { method: "POST", headers: MCP_HEADERS, body: initializeWith("x".repeat(300_000)) });
+    await res.text();
+    expect(res.status).toBe(200);
+    await new Promise<void>((r) => server.close(() => r()));
+  });
+
+  it("answers a body over server.http.maxRequestBytes with a JSON-RPC error, not an HTML page", async () => {
+    const { server, url } = await listen({ maxRequestBytes: 1000 });
+    const res = await fetch(url, { method: "POST", headers: MCP_HEADERS, body: initializeWith("x".repeat(2000)) });
+    expect(res.status).toBe(413);
+    expect(res.headers.get("content-type")).toMatch(/application\/json/);
+    expect(await res.json()).toEqual({
+      jsonrpc: "2.0", id: null, error: { code: -32600, message: "Request body larger than 1000 bytes" },
+    });
+    await new Promise<void>((r) => server.close(() => r()));
+  });
+
+  it("answers malformed JSON with JSON-RPC parse error -32700", async () => {
+    const { server, url } = await listen();
+    const res = await fetch(url, { method: "POST", headers: MCP_HEADERS, body: "{not json" });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } });
+    await new Promise<void>((r) => server.close(() => r()));
+  });
+});
+
 describe("tool set lifetime", () => {
   it("builds the tools once, so every session shares one OIDC token", async () => {
     // Per-session tools meant a new credential, and a new IdP token request, per session.

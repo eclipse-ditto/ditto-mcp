@@ -53,7 +53,8 @@ describe("loadConfig", () => {
     expect(cfg.server.name).toBe("ditto-mcp");
     expect(cfg.server.http).toMatchObject({
       port: 8080, host: "127.0.0.1", enableDnsRebindingProtection: true,
-      sessionIdleTimeoutMs: 1_800_000, sessionEvictionMinIdleMs: 300_000, maxSessions: 100, auth: { mode: "none" },
+      sessionIdleTimeoutMs: 1_800_000, sessionEvictionMinIdleMs: 300_000, maxSessions: 100, maxRequestBytes: 4_194_304,
+      auth: { mode: "none" },
     });
     expect(cfg.knowledge.store).toEqual({ kind: "pgvector", sqlite: {}, pgvector: { table: "ditto_kn" } });
     expect(cfg.knowledge.embedding).toEqual({

@@ -57,7 +57,7 @@ bin/ingest.ts
 | `tools/knowledge.ts` | `makeKnowledgeTools()`: `search` / `get_chunk` schemas, descriptions, output format |
 | `server/build-server.ts` | `buildServer()`: ToolRegistry to SDK `McpServer`; version read from package.json; `_init` placeholder |
 | `server/request-ctx.ts` | `buildCtx()`: the SDK's `extra` argument to `RequestCtx` |
-| `server/http-app.ts` | `createHttpApp()` returns `HttpApp` (Express + `closeSessions()`): `/mcp` POST/GET/DELETE, bearer gate, loopback fail-closed check, Host allowlist, session routing |
+| `server/http-app.ts` | `createHttpApp()` returns `HttpApp` (Express + `closeSessions()`): `/mcp` POST/GET/DELETE, bearer gate, loopback fail-closed check, Host allowlist, body limit, JSON-RPC error handler, session routing |
 | `server/session-table.ts` | `SessionTable`: session cap, idle sweep, two-phase reserve/add admission, eviction, `closeAll()` |
 | `bin/stdio.ts`, `bin/http.ts`, `bin/ingest.ts` | Entrypoints: `main().catch` prints `fatal:` and exits 1; `http.ts` shuts down gracefully on SIGTERM/SIGINT |
 | `ditto/openapi.ts` | `parseOperations(spec)` returns `DittoOperation[]`: `$ref` resolution, path/query/header params, `isReservedHeader()`, body media type, body schema, `MERGE_PATCH`, `mediaType()` |

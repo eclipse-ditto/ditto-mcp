@@ -107,7 +107,7 @@ export function createHttpApp(
     app.use("/mcp", bearerAuthMiddleware(config.server.http.auth));
   }
 
-  app.use(express.json());
+  app.use(express.json({ limit: config.server.http.maxRequestBytes }));
 
   const { sessionIdleTimeoutMs, sessionEvictionMinIdleMs, maxSessions } = config.server.http;
   const sessions = new SessionTable<StreamableHTTPServerTransport>(
@@ -254,6 +254,24 @@ export function createHttpApp(
         `Set server.http.allowedHosts explicitly for remote deployments.\n`,
     );
   }
+
+  // Last, so it catches the body parser's errors. Express would answer them with an HTML page,
+  // which a JSON-RPC client can only report as an opaque failure.
+  app.use((err: unknown, req: Request, res: Response, next: NextFunction): void => {
+    if (res.headersSent) return next(err);
+    const { type, status } = err as { type?: unknown; status?: unknown };
+    const reply = (code: number, rpcCode: number, message: string) =>
+      void res.status(code).json({ jsonrpc: "2.0", error: { code: rpcCode, message }, id: null });
+    if (type === "entity.too.large") {
+      return reply(413, -32600, `Request body larger than ${config.server.http.maxRequestBytes} bytes`);
+    }
+    if (type === "entity.parse.failed") return reply(400, -32700, "Parse error");
+    if (typeof status === "number" && status >= 400 && status < 500) return reply(status, -32600, "Invalid Request");
+    process.stderr.write(
+      `[ditto-mcp] ${req.method} /mcp error: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    reply(500, -32603, "Internal error");
+  });
 
   return Object.assign(app, { closeSessions: () => sessions.closeAll() });
 }
