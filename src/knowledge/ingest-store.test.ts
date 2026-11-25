@@ -46,6 +46,19 @@ describe("withIngestStore (sqlite)", () => {
     expect(readdirSync(dir)).toEqual([]);
   });
 
+  it("does not replace the index when the signal aborts after the build", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ditto-idx-"));
+    const path = join(dir, "index.db");
+    const config = AppConfigSchema.parse({ knowledge: { store: { kind: "sqlite", sqlite: { path } } } });
+    const ac = new AbortController();
+    await expect(withIngestStore(config, async (store) => {
+      await store.addChunks([{ id: "a", source: "s", title: "T", text: "netty", cite: "x" }]);
+      await store.setMeta({ schemaVersion: 1, retriever: "fts", complete: true });
+      ac.abort(new Error("stopped by SIGTERM"));
+    }, ac.signal)).rejects.toThrow("stopped by SIGTERM");
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
   it("two overlapping ingests on the same path both complete; the last finisher's index is live", async () => {
     const dir = mkdtempSync(join(tmpdir(), "ditto-idx-"));
     const path = join(dir, "index.db");

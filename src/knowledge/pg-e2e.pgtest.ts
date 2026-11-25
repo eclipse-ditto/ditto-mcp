@@ -109,6 +109,26 @@ describe("pgvector end-to-end", () => {
     expect(await exists(`${table}_staging_chunks`)).toBe(false);
   });
 
+  it("an ingest stopped after its build does not swap, drops its staging tables and frees the lock", async () => {
+    const table = `stop_${Math.floor(performance.now())}`;
+    await withIngestStore(cfg(table), async (store) => {
+      await buildIndex([src], store, fake, metaFor(cfg(table), fake));
+    });
+    const other: KnowledgeSource = { id: "local", loadChunks: async () => [chunk("local#0", "replacement text")] };
+    const ac = new AbortController();
+    await expect(withIngestStore(cfg(table), async (store) => {
+      await buildIndex([other], store, fake, metaFor(cfg(table), fake));
+      ac.abort(new Error("stopped by SIGTERM"));
+    }, ac.signal)).rejects.toThrow("stopped by SIGTERM");
+    expect(await exists(`${table}_staging_chunks`)).toBe(false);
+    const svc = await buildKnowledgeService(cfg(table), { embeddingProvider: fake });
+    expect((await svc!.search("why does it die on reconnect", 2))[0].chunk.text.toLowerCase()).toContain("out of memory");
+    // The lock is free: the next ingest runs.
+    await withIngestStore(cfg(table), async (store) => {
+      await buildIndex([other], store, fake, metaFor(cfg(table), fake));
+    });
+  });
+
   it("a second ingest on the same table fails fast; other tables are not blocked", async () => {
     const tableA = `lock_a_${Math.floor(performance.now())}`;
     const tableB = `lock_b_${Math.floor(performance.now())}`;

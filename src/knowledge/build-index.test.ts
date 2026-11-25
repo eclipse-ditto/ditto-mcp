@@ -33,6 +33,38 @@ let store: SqliteKnowledgeStore;
 afterEach(async () => await store?.close());
 
 describe("buildIndex", () => {
+  it("stops before writing anything once the signal aborts, even with skipped items allowed", async () => {
+    // An aborted fetch surfaces as a skipped item: without the check, a stopped ingest reported
+    // "item(s) failed to load", and with --force wrote an index without them.
+    store = new SqliteKnowledgeStore();
+    const ac = new AbortController();
+    const stopping: KnowledgeSource = {
+      id: "s1",
+      loadChunks: async (_s, onSkip) => {
+        ac.abort(new Error("stopped by SIGTERM"));
+        onSkip?.("doc", "This operation was aborted");
+        return [chunk("a", "reconnect memory")];
+      },
+    };
+    await expect(buildIndex([stopping], store, fake, undefined, { signal: ac.signal, allowSkipped: true }))
+      .rejects.toThrow("stopped by SIGTERM");
+    expect(await store.isPopulated()).toBe(false);
+  });
+
+  it("reports an abort, not the source failure it caused", async () => {
+    store = new SqliteKnowledgeStore();
+    const ac = new AbortController();
+    const failing: KnowledgeSource = {
+      id: "public",
+      loadChunks: async () => {
+        ac.abort(new Error("stopped by SIGTERM"));
+        throw new Error("cannot fetch https://x/llms.txt: This operation was aborted");
+      },
+    };
+    await expect(buildIndex([failing], store, undefined, undefined, { signal: ac.signal }))
+      .rejects.toThrow("stopped by SIGTERM");
+  });
+
   it("adds chunks (fts) with no embedder", async () => {
     store = new SqliteKnowledgeStore();
     await buildIndex([src("s1", [chunk("a", "reconnect memory")])], store);

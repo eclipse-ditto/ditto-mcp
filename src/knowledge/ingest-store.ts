@@ -17,9 +17,14 @@ import type { AppConfig } from "../config/schema.js";
 import type { KnowledgeStore } from "./knowledge-store.js";
 import { openStore, importPgStore } from "./store-factory.js";
 
+/**
+ * Run `fn` against a fresh store and put the result live only if it succeeds. Once `signal`
+ * aborts, the result is discarded like a failure: the live index is left untouched.
+ */
 export async function withIngestStore(
   config: AppConfig,
   fn: (store: KnowledgeStore) => Promise<void>,
+  signal?: AbortSignal,
 ): Promise<void> {
   const kind = config.knowledge.store.kind;
   if (kind === "sqlite") {
@@ -29,6 +34,7 @@ export async function withIngestStore(
     const store = await openStore(config, { path: tmp });
     try {
       await fn(store);
+      signal?.throwIfAborted();
       await store.close();
     } catch (err) {
       await store.close();
@@ -48,10 +54,12 @@ export async function withIngestStore(
       try {
         await staging.reset();
         await fn(staging);
+        signal?.throwIfAborted();
         await staging.buildVectorIndex();
         // If the lock session died, another ingest may have written to the staging tables.
         // Checked after the (possibly long) index build, right before the swap.
         await lock.assertHeld();
+        signal?.throwIfAborted();
         await staging.swapIntoLive();
       } catch (err) {
         // Without the lock the staging tables may belong to another ingest: leave them.

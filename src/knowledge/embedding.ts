@@ -70,13 +70,15 @@ export class LocalEmbeddings implements EmbeddingProvider {
     return this.extractorPromise;
   }
 
-  async embed(texts: string[]): Promise<number[][]> {
+  async embed(texts: string[], signal?: AbortSignal): Promise<number[][]> {
     if (texts.length === 0) return [];
     const extractor = await this.extractor();
     // Embed in bounded batches: a single forward pass over the whole corpus
     // allocates a tensor for every input at once and can exhaust memory.
     const out: number[][] = [];
     for (const batch of toBatches(texts, this.batchSize)) {
+      // Embedding a corpus on CPU takes minutes; a stopped ingest must not sit through it.
+      signal?.throwIfAborted();
       const output = await extractor(batch, { pooling: "mean", normalize: true });
       out.push(...(output.tolist() as number[][]));
     }

@@ -41,7 +41,8 @@ bin/stdio.ts, bin/http.ts
   http:  createHttpApp(config, registry); one McpServer + transport per session;
          SIGTERM/SIGINT -> server.close() + app.closeSessions(), 5 s backstop
 bin/ingest.ts
-  makeSources() + makeEmbedder()  ->  withIngestStore(config, store => buildIndex(...))
+  makeSources() + makeEmbedder()  ->  withIngestStore(config, store => buildIndex(...), signal)
+  SIGTERM/SIGINT aborts `signal`: the failure path cleans up, the live index stays as it was
 ```
 
 ## Code map (`src/`)
@@ -59,7 +60,7 @@ bin/ingest.ts
 | `server/request-ctx.ts` | `buildCtx()`: the SDK's `extra` argument to `RequestCtx` |
 | `server/http-app.ts` | `createHttpApp()` returns `HttpApp` (Express + `closeSessions()`): `/mcp` POST/GET/DELETE, bearer gate, loopback fail-closed check, Host allowlist, body limit, JSON-RPC error handler, session routing |
 | `server/session-table.ts` | `SessionTable`: session cap, idle sweep, two-phase reserve/add admission, eviction, `closeAll()` |
-| `bin/stdio.ts`, `bin/http.ts`, `bin/ingest.ts` | Entrypoints: `main().catch` prints `fatal:` and exits 1; `http.ts` shuts down gracefully on SIGTERM/SIGINT |
+| `bin/stdio.ts`, `bin/http.ts`, `bin/ingest.ts` | Entrypoints: `main().catch` prints `fatal:` and exits 1; on SIGTERM/SIGINT `http.ts` shuts down gracefully, `ingest.ts` aborts and cleans up |
 | `ditto/openapi.ts` | `parseOperations(spec)` returns `DittoOperation[]`: `$ref` resolution, path/query/header params, `isReservedHeader()`, body media type, body schema, `MERGE_PATCH`, `mediaType()` |
 | `ditto/tool-policy.ts` | `isSudo(op)`, `isAllowed(op, policy)` |
 | `ditto/action-tool.ts` | `toolName()` (`ditto_` prefix, 64-char cap + hash), zod input schema, `operationToTool()` (picks the credential) |

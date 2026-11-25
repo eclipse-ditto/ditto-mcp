@@ -222,6 +222,8 @@ Links in `llms.txt` that are not to markdown documents are ignored, and so are m
 
 If an ingest fails, the existing index is left unchanged.
 
+`SIGTERM` or `SIGINT` (`docker stop`, a deleted Kubernetes Job, Ctrl-C) stops an ingest the same way: it removes its temporary file (SQLite) or staging tables (Postgres), leaves the existing index unchanged, and exits with status 1. A second signal exits at once, without that cleanup.
+
 ```bash
 # Skip individual failed items and build with the rest
 npm run dev:ingest -- --force  # development
@@ -237,7 +239,7 @@ ditto-mcp-ingest --force       # production
 **SQLite notes:**
 
 - Concurrent ingests on the same path are safe: each builds into a `*.tmp` file, and the last one to finish wins.
-- A killed ingest may leave `*.tmp` / `*.tmp-journal` files next to the index (clean them up manually).
+- An ingest killed outright (`SIGKILL`, or a second `SIGTERM`/`SIGINT`) may leave `*.tmp` / `*.tmp-journal` files next to the index (clean them up manually).
 
 ## Configuration
 

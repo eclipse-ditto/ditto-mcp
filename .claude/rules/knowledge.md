@@ -38,6 +38,7 @@ This never fails startup. On any error it logs and returns `undefined`, and the 
 
   Only then does it write the chunks, then the vectors (if there is an embedder), and the meta last, with `complete: true`.
 - Ingest is strict by default; `--force` tolerates skipped items only. It never writes a partial or empty index.
+- Stopping: `bin/ingest.ts` turns the first SIGTERM/SIGINT into an abort (`IngestError("stopped by SIGTERM")`) passed to `buildIndex` and `withIngestStore`; a second signal exits at once. In a container node is PID 1, which gets no default signal action, so without this `docker stop` waits for SIGKILL. The signal is checked after the sources load (aborted fetches surface as skipped items, which must not be reported as failures or, with `--force`, written without), per embedding batch, before each write, and in `withIngestStore` before the rename or swap. An abort then takes the failure path: the tmp file is removed, or the staging tables dropped and the lock released.
 - Malformed and non-markdown links in llms.txt are filtered out with a warning. They don't count as skipped items, since re-running can't fix them.
 - SQLite: the index is built in `${path}.<random>.tmp` and moved over the target with `renameSync` on success; the temp file is deleted on failure. With concurrent ingests, the last to finish wins.
 - pgvector, in order:

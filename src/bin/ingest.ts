@@ -19,7 +19,29 @@ import { withIngestStore } from "../knowledge/ingest-store.js";
 import { IngestError } from "../knowledge/ingest-error.js";
 import type { EmbeddingProvider } from "../knowledge/embedding.js";
 
+/**
+ * In a container node runs as PID 1, which gets no default action for signals: without this,
+ * `docker stop` or a deleted Kubernetes Job waits out the grace period and SIGKILLs the ingest,
+ * leaving its *.tmp file or staging tables behind. The first signal stops the build, which then
+ * cleans up as for any failure; a second one exits at once.
+ */
+function stopOnSignals(): AbortSignal {
+  const stop = new AbortController();
+  const onSignal = (signal: NodeJS.Signals): void => {
+    if (stop.signal.aborted) {
+      process.stderr.write(`[ditto-mcp ingest] ${signal} again; exiting without cleanup\n`);
+      process.exit(1);
+    }
+    process.stderr.write(`[ditto-mcp ingest] ${signal} received; stopping\n`);
+    stop.abort(new IngestError(`stopped by ${signal}`));
+  };
+  process.on("SIGTERM", onSignal);
+  process.on("SIGINT", onSignal);
+  return stop.signal;
+}
+
 async function main(): Promise<void> {
+  const signal = stopOnSignals();
   const config = loadConfig(process.env.DITTO_MCP_CONFIG);
   if (!config.knowledge.enabled) throw new Error("knowledge is disabled in config");
 
@@ -35,8 +57,9 @@ async function main(): Promise<void> {
 
   let chunks = 0;
   let skippedCount = 0;
+  signal.throwIfAborted();
   await withIngestStore(config, async (store) => {
-    const report = await buildIndex(sources, store, embedder, metaFor(config, embedder), { allowSkipped: force });
+    const report = await buildIndex(sources, store, embedder, metaFor(config, embedder), { allowSkipped: force, signal });
     chunks = report.chunks;
     // Print skipped items when --force is used
     if (report.skipped.length > 0) {
@@ -45,7 +68,7 @@ async function main(): Promise<void> {
       }
       skippedCount = report.skipped.length;
     }
-  });
+  }, signal);
 
   if (skippedCount > 0) {
     process.stderr.write(`[ditto-mcp ingest] built without ${skippedCount} item(s) that failed to load (--force)\n`);

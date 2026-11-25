@@ -39,5 +39,5 @@ paths:
 ## Entrypoints
 - Each one has the same shape: `async function main()`, then `main().catch(err => { stderr "...fatal: ..."; process.exit(1) })`.
 - Config comes only from the `DITTO_MCP_CONFIG` env var.
-- `bin/http.ts` handles `SIGTERM`/`SIGINT` (`process.once`): `server.close()`, then `app.closeSessions()` (event streams never end on their own and would hold `close()` open), then `closeIdleConnections()`; a 5 s unref'ed backstop exits with 1. Keep it: in the container node is PID 1, which gets no default signal action, so without the handler `docker stop` waits for SIGKILL.
+- `bin/http.ts` handles `SIGTERM`/`SIGINT` (`process.once`): `server.close()`, then `app.closeSessions()` (event streams never end on their own and would hold `close()` open), then `closeIdleConnections()`; a 5 s unref'ed backstop exits with 1. Keep it: in the container node is PID 1, which gets no default signal action, so without the handler `docker stop` waits for SIGKILL. `bin/ingest.ts` handles the same signals by aborting the build (see `knowledge.md`).
 - `bin/*.ts` start with `#!/usr/bin/env node`. `package.json` `bin` maps `ditto-mcp-{stdio,http,ingest}` to `dist/bin/*.js`.

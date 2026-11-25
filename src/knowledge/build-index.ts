@@ -67,6 +67,8 @@ export async function buildIndex(
       });
       allChunks.push(...chunks);
     } catch (err) {
+      // A stop request fails the fetches; report the stop, not the failure it caused.
+      opts.signal?.throwIfAborted();
       const reason = errorReason(err);
       if (opts.allowFailedSources) {
         skipped.push({ source: source.id, item: "(source)", reason });
@@ -75,6 +77,10 @@ export async function buildIndex(
       }
     }
   }
+
+  // Aborted fetches show up as skipped items. Stop here rather than report them as failed to
+  // load, or, with allowSkipped, write an index without them.
+  opts.signal?.throwIfAborted();
 
   // Step 3: Validate chunks
   const formatSkipped = (items: SkippedItem[]) =>
@@ -110,8 +116,10 @@ export async function buildIndex(
   await store.addChunks(allChunks);
   if (embedder && allChunks.length > 0) {
     const vectors = await embedder.embed(allChunks.map((c) => c.text), opts.signal);
+    opts.signal?.throwIfAborted();
     await store.upsertVectors(allChunks.map((c, i) => ({ id: c.id, vector: vectors[i] })));
   }
+  opts.signal?.throwIfAborted();
   await store.setMeta({
     schemaVersion: SCHEMA_VERSION,
     retriever: meta?.retriever ?? "fts",

@@ -16,7 +16,9 @@ import { mkdtempSync, writeFileSync, existsSync, rmSync, readFileSync } from "no
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { readdirSync } from "node:fs";
+import { createServer as createHttpServer } from "node:http";
 import { createServer, type AddressInfo } from "node:net";
 import { SqliteKnowledgeStore } from "../knowledge/sqlite-knowledge-store.js";
 import { docKey } from "../knowledge/chunker.js";
@@ -48,6 +50,53 @@ async function closedPort(): Promise<number> {
 }
 
 describe("ingest CLI (spawn e2e)", () => {
+  it("stops on SIGTERM, cleaning up and leaving the existing index unchanged", async () => {
+    // As PID 1 in a container, node gets no default action for SIGTERM: without a handler,
+    // `docker stop` waited for SIGKILL, which also left the *.tmp build file behind.
+    const corpus = mkdtempSync(join(tmpdir(), "ditto-corpus-"));
+    writeFileSync(join(corpus, "a.md"), "# Memory\n\nOut of memory.");
+    const idxDir = mkdtempSync(join(tmpdir(), "ditto-idx-"));
+    const { path, cfgPath } = makeConfig(idxDir, [corpus]);
+    expect(spawnSync(process.execPath, ["--import", "tsx", entry], {
+      env: { ...process.env, DITTO_MCP_CONFIG: cfgPath },
+    }).status).toBe(0);
+    const before = readFileSync(path);
+
+    // A docs site whose one document never arrives, so the ingest is mid-build when signalled.
+    let docRequested!: () => void;
+    const requested = new Promise<void>((r) => { docRequested = r; });
+    const site = createHttpServer((req, res) => {
+      if (req.url === "/llms.txt") res.end("- [Doc](/doc.md)\n");
+      else docRequested();
+    });
+    await new Promise<void>((r) => site.listen(0, "127.0.0.1", r));
+    const { port } = site.address() as AddressInfo;
+    makeConfig(idxDir, [corpus], `http://127.0.0.1:${port}/llms.txt`);
+
+    const child = spawn(process.execPath, ["--import", "tsx", entry], {
+      env: { ...process.env, DITTO_MCP_CONFIG: cfgPath },
+    });
+    let stderr = "";
+    child.stderr.on("data", (c) => { stderr += String(c); });
+    const exited = new Promise<{ code: number | null; signal: string | null }>((r) =>
+      child.on("close", (code, signal) => r({ code, signal })));
+    const timer = setTimeout(() => child.kill("SIGKILL"), 20_000);
+    try {
+      await requested;
+      child.kill("SIGTERM");
+      expect(await exited).toEqual({ code: 1, signal: null });
+      expect(stderr).toContain("SIGTERM");
+      expect(stderr).toContain("the existing index was left unchanged");
+      expect(readFileSync(path).equals(before)).toBe(true);
+      expect(readdirSync(idxDir).filter((f) => f.includes(".tmp"))).toEqual([]);
+    } finally {
+      clearTimeout(timer);
+      child.kill("SIGKILL");
+      site.closeAllConnections();
+      await new Promise<void>((r) => site.close(() => r()));
+    }
+  }, 30000);
+
   it("builds a persisted fts index from a local dir corpus", async () => {
     const corpus = mkdtempSync(join(tmpdir(), "ditto-corpus-"));
     writeFileSync(join(corpus, "a.md"), "# Reconnect\n\nNetty leak out of memory crash.");
