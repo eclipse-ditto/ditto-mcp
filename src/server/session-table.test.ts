@@ -132,6 +132,17 @@ describe("SessionTable", () => {
     expect(table.reserve()).toBeDefined();
   });
 
+  it("closes every session, busy or idle, at shutdown", async () => {
+    const { table, open } = setup(10);
+    const idle = open("idle");
+    const busy = open("busy");
+    table.begin(busy.session); // e.g. an event stream, which never ends on its own
+    await table.closeAll();
+    expect([idle.transport.closed, busy.transport.closed]).toEqual([true, true]);
+    expect(table.get("idle")).toBeUndefined();
+    expect(table.get("busy")).toBeUndefined();
+  });
+
   it("sweeps idle sessions past the timeout and keeps busy ones", () => {
     const { table, open, advance } = setup(10, 1000);
     const idle = open("idle");

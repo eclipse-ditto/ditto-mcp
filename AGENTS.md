@@ -38,7 +38,8 @@ bin/stdio.ts, bin/http.ts
   registerTools(config, knowledge)     tools/index.ts      ToolRegistry, built ONCE and shared
     pingTool, makeKnowledgeTools(), makeActionTools() (lazy import; throws, which stops startup)
   stdio: buildServer(registry) + StdioServerTransport
-  http:  createHttpApp(config, registry); one McpServer + transport per session
+  http:  createHttpApp(config, registry); one McpServer + transport per session;
+         SIGTERM/SIGINT -> server.close() + app.closeSessions(), 5 s backstop
 bin/ingest.ts
   makeSources() + makeEmbedder()  ->  withIngestStore(config, store => buildIndex(...))
 ```
@@ -56,9 +57,9 @@ bin/ingest.ts
 | `tools/knowledge.ts` | `makeKnowledgeTools()`: `search` / `get_chunk` schemas, descriptions, output format |
 | `server/build-server.ts` | `buildServer()`: ToolRegistry to SDK `McpServer`; version read from package.json; `_init` placeholder |
 | `server/request-ctx.ts` | `buildCtx()`: the SDK's `extra` argument to `RequestCtx` |
-| `server/http-app.ts` | `createHttpApp()`: Express `/mcp` POST/GET/DELETE, bearer gate, loopback fail-closed check, Host allowlist, session routing |
-| `server/session-table.ts` | `SessionTable`: session cap, idle sweep, two-phase reserve/add admission, eviction |
-| `bin/stdio.ts`, `bin/http.ts`, `bin/ingest.ts` | Entrypoints: `main().catch` prints `fatal:` and exits 1 |
+| `server/http-app.ts` | `createHttpApp()` returns `HttpApp` (Express + `closeSessions()`): `/mcp` POST/GET/DELETE, bearer gate, loopback fail-closed check, Host allowlist, session routing |
+| `server/session-table.ts` | `SessionTable`: session cap, idle sweep, two-phase reserve/add admission, eviction, `closeAll()` |
+| `bin/stdio.ts`, `bin/http.ts`, `bin/ingest.ts` | Entrypoints: `main().catch` prints `fatal:` and exits 1; `http.ts` shuts down gracefully on SIGTERM/SIGINT |
 | `ditto/openapi.ts` | `parseOperations(spec)` returns `DittoOperation[]`: `$ref` resolution, path/query/header params, `isReservedHeader()`, body media type, body schema, `MERGE_PATCH`, `mediaType()` |
 | `ditto/tool-policy.ts` | `isSudo(op)`, `isAllowed(op, policy)` |
 | `ditto/action-tool.ts` | `toolName()` (`ditto_` prefix, 64-char cap + hash), zod input schema, `operationToTool()` (picks the credential) |

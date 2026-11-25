@@ -97,6 +97,8 @@ docker run -d -p 3000:3000 \
 
 The build is pinned: the base image by digest, dependencies by `package-lock.json` via `npm ci`, and onnxruntime's unused CUDA/TensorRT download is skipped. Building the same commit on the same CPU architecture therefore yields the same image contents. `docker build` targets the machine's own architecture — arm64 on Apple Silicon, amd64 on most Linux hosts and servers; to build one image for both, see [Publishing](#publishing-to-a-private-registry-eg-artifactory). To pick up a newer Node 22 or Debian security fixes, update `NODE_IMAGE` in the `Dockerfile` to the current digest (`docker buildx imagetools inspect node:22-slim`) and rebuild.
 
+On `SIGTERM` or `SIGINT` (`docker stop`, a Kubernetes pod termination, Ctrl-C) the server stops accepting connections, closes every MCP session, and exits; requests still open after 5 s are cut off. Sessions live in memory, so clients re-initialize against the restarted server.
+
 Point your MCP client at the HTTP endpoint, passing the token:
 
 ```json

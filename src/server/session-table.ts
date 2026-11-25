@@ -101,6 +101,14 @@ export class SessionTable<T extends { close(): Promise<void> }> {
     session.lastActive = this.now();
   }
 
+  /** Close every session, at shutdown: their event streams never end on their own. */
+  async closeAll(): Promise<void> {
+    const all = [...this.sessions.values()];
+    this.sessions.clear();
+    this.doomed.clear();
+    await Promise.allSettled(all.map((s) => s.transport.close()));
+  }
+
   /** Close sessions with no request in flight for longer than the idle timeout. */
   sweep(): void {
     const cutoff = this.now() - this.idleTimeoutMs;

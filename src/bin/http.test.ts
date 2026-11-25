@@ -13,6 +13,9 @@
 
 import { describe, it, expect } from "vitest";
 import { spawn } from "node:child_process";
+import { createServer, type AddressInfo } from "node:net";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, join } from "node:path";
 import { writeFileSync, mkdtempSync } from "node:fs";
@@ -63,5 +66,46 @@ describe("http entrypoint (spawn e2e)", () => {
     expect(code).toBe(1);
     expect(stderr).toContain("[ditto-mcp] fatal:");
     expect(stderr).toContain("http://127.0.0.1:9/spec.yml");
+  }, 30_000);
+
+  it("shuts down promptly on SIGTERM, closing open sessions", async () => {
+    // As PID 1 in a container, node gets no default action for SIGTERM: without a handler,
+    // `docker stop` waits out its grace period and SIGKILLs the server.
+    const port = await new Promise<number>((res) => {
+      const probe = createServer().listen(0, "127.0.0.1", () => {
+        const { port } = probe.address() as AddressInfo;
+        probe.close(() => res(port));
+      });
+    });
+    const cfgPath = join(mkdtempSync(join(tmpdir(), "ditto-mcp-http-")), "config.json");
+    writeFileSync(cfgPath, JSON.stringify({ server: { http: { port } }, knowledge: { enabled: false } }));
+    const child = spawn(process.execPath, ["--import", "tsx", entry], {
+      env: { ...process.env, DITTO_MCP_CONFIG: cfgPath },
+    });
+    let stderr = "";
+    const exited = new Promise<{ code: number | null; signal: string | null }>((res) =>
+      child.on("close", (code, signal) => res({ code, signal })));
+    const timer = setTimeout(() => child.kill("SIGKILL"), 20_000);
+    try {
+      await new Promise<void>((res) => child.stderr.on("data", (c) => {
+        stderr += String(c);
+        if (stderr.includes("listening")) res();
+      }));
+      // A connected client holds its event stream open, which alone would keep the server open.
+      const client = new Client({ name: "t", version: "1" });
+      await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`)));
+      await client.ping();
+
+      const started = Date.now();
+      child.kill("SIGTERM");
+      const { code, signal } = await exited;
+      expect({ code, signal }).toEqual({ code: 0, signal: null });
+      expect(Date.now() - started).toBeLessThan(3_000); // not the 5 s backstop
+      expect(stderr).toContain("SIGTERM");
+      await client.close().catch(() => undefined);
+    } finally {
+      clearTimeout(timer);
+      child.kill("SIGKILL");
+    }
   }, 30_000);
 });

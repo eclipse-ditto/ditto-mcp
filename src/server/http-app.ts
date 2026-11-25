@@ -74,6 +74,9 @@ function bearerAuthMiddleware(auth: HttpAuthConfig) {
   };
 }
 
+/** The Express app, plus a way to end every MCP session at shutdown. */
+export type HttpApp = Express & { closeSessions(): Promise<void> };
+
 /**
  * `registry` is built once at startup and shared by every session: rebuilding it per session
  * re-read (or re-fetched) the OpenAPI spec and gave each session fresh credentials with empty
@@ -82,7 +85,7 @@ function bearerAuthMiddleware(auth: HttpAuthConfig) {
 export function createHttpApp(
   config: AppConfig,
   registry: ToolRegistry,
-): Express {
+): HttpApp {
   // Fail closed: an unauthenticated endpoint on a routable interface hands every caller the
   // server's Ditto identity — including `devopsCredential`, which reaches /devops and the
   // secret-bearing connectivity API. DNS-rebinding protection is a Host check, not access control.
@@ -252,5 +255,5 @@ export function createHttpApp(
     );
   }
 
-  return app;
+  return Object.assign(app, { closeSessions: () => sessions.closeAll() });
 }
