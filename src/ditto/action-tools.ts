@@ -79,7 +79,7 @@ export async function makeActionTools(config: AppConfig, deps: ActionToolDeps = 
   const client =
     deps.client ??
     (config.ditto.baseUrl
-      ? new HttpDittoClient(config.ditto.baseUrl)
+      ? new HttpDittoClient(config.ditto.baseUrl, { timeoutMs: config.ditto.requestTimeoutMs })
       : undefined);
   // The tools are built once at startup, so fail it rather than serve without them until a
   // restart: an orchestrator then retries, and the cause is in front of the operator.

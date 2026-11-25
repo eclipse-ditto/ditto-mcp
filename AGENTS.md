@@ -64,7 +64,7 @@ bin/ingest.ts
 | `ditto/tool-policy.ts` | `isSudo(op)`, `isAllowed(op, policy)` |
 | `ditto/action-tool.ts` | `toolName()` (`ditto_` prefix, 64-char cap + hash), zod input schema, `operationToTool()` (picks the credential) |
 | `ditto/action-tools.ts` | `makeActionTools()`: spec resolution, credentials, policy filter, name de-dup; `BUNDLED_SPEC_PATH` |
-| `ditto/client.ts` | `HttpDittoClient.execute()`: builds the URL and headers, guards path and header params, encodes the body |
+| `ditto/client.ts` | `HttpDittoClient.execute()`: builds the URL and headers, guards path and header params, encodes the body, bounds each call by `ditto.requestTimeoutMs` |
 | `ditto/credential.ts` | `DittoCredential`, `createConfigCredential()`, `OidcClientCredential` (client-credentials grant, token cache, shared fetch) |
 | `ditto/fake-ditto.ts`, `ditto/fake-oidc.ts` | Test-only HTTP fakes |
 | `knowledge/types.ts` | `Chunk`, `RetrievedChunk`, `KnowledgeSource`, `Retriever`, `SkipFn`, `SkippedItem` |

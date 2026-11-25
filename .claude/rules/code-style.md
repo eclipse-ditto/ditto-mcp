@@ -42,7 +42,7 @@ Every new `.ts` file starts with the EPL-2.0 block comment, copied verbatim from
 ## Async, cancellation, network
 - Pass `ctx.signal` (from `RequestCtx`) to every fetch or query a tool call starts.
 - A shared in-flight promise (such as the OIDC token fetch) must not carry any one caller's signal. A caller that aborts stops waiting (`untilAborted`); the fetch itself keeps going for the others.
-- Every outbound fetch has a timeout: `AbortSignal.timeout(15000)`, combined with any caller signal through `AbortSignal.any`.
+- Every outbound fetch has a timeout: `AbortSignal.timeout(15000)`, combined with any caller signal through `AbortSignal.any`. Calls to Ditto use the configurable `ditto.requestTimeoutMs` instead, since a live message may legitimately wait up to 60 s.
 - Never let a rejection go unhandled: attach handlers before any branch that can return early.
 - Clean up on every path: close stores, pools, and clients in `try/finally`, and remove temp files on failure.
 

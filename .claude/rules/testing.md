@@ -26,7 +26,7 @@ To run a single file: `npx vitest run <file>`. For a pg file, add `--config vite
 - `*.test.ts` never touches the real network. Use the fakes and the injection points instead:
   - `startFakeDitto(handler)` (`ditto/fake-ditto.ts`): a real HTTP server on `127.0.0.1:0` that records method, url, auth, content-type, body, and all request headers.
   - `startFakeOidc(token)` (`ditto/fake-oidc.ts`): a token endpoint that counts calls.
-  - `fetchFn` for `PublicSource` and for `buildKnowledgeService` (through `FactoryDeps`); `loadSpec` and `client` for `makeActionTools`; `fetchFn` for `HttpDittoClient` and `OidcClientCredential`; `now` for `SessionTable`.
+  - `fetchFn` for `PublicSource` and for `buildKnowledgeService` (through `FactoryDeps`); `loadSpec` and `client` for `makeActionTools`; `fetchFn` for `OidcClientCredential`; `{ fetchFn, timeoutMs }` for `HttpDittoClient`; `now` for `SessionTable`.
   - A fake embedder: `{ dim: 3, embed: async (t) => t.map(() => [1, 0, 0]) }`, together with `knowledge: { embedding: { dim: 3 } }` in the config.
 - SQLite tests use `":memory:"`, or a file under `mkdtempSync(join(tmpdir(), "..."))`.
 - HTTP tests listen with `app.listen(0)` and read the port back. For protocol end-to-end tests, drive the server with the SDK's real `Client` + `StreamableHTTPClientTransport`. For status and header checks, use raw `node:http` `request`.

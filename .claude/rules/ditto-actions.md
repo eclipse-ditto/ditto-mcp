@@ -39,6 +39,7 @@ An allowlist entry is either an operationId or `"METHOD /raw/spec/{path}"`, with
 - `encodePathParam` substitutes a path param: `*Path` params (paths inside an entity) keep their `/` and encode each segment; every other param is one encoded segment. The guard rules are in `security.md`.
 - A body is sent only when `op.hasBody` and `args.body !== undefined`. `encodeBody` encodes it by media type: JSON and `+json` types with `JSON.stringify`, a form-urlencoded object with `URLSearchParams`, a string as-is.
 - `execute` returns `{ status, body }`, and the tool answers with the text `HTTP <status>\n<body>`. A non-2xx status is a result, not an exception.
+- Each call, token fetch included, is bounded by `ditto.requestTimeoutMs` (default 70 s, above Ditto's 60 s maximum wait for a live message response), combined with the caller's signal through `AbortSignal.any`. A timeout throws `ditto did not answer <METHOD> <path> within <n> ms (ditto.requestTimeoutMs)`; a caller's cancellation is rethrown as is.
 
 ## Credentials (`credential.ts`)
 - `basic` sends a static `Authorization: Basic ...` header. Without a username, no header is sent.

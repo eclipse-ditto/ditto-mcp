@@ -75,7 +75,7 @@ describe("bundled Ditto spec", () => {
     const ops = parseOperations(YAML.parse(readFileSync(specPath, "utf8")));
     let url = "";
     const fetchFn = (async (u: string | URL | Request) => { url = String(u); return new Response(""); }) as typeof fetch;
-    const client = new HttpDittoClient("http://ditto", fetchFn);
+    const client = new HttpDittoClient("http://ditto", { fetchFn });
     const literal = new Set<string>();
     for (const op of ops) {
       const pathParams = op.params.filter((p) => p.in === "path");

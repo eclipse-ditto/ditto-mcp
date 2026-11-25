@@ -24,7 +24,31 @@ const cred = (h?: string) => ({ authHeader: async () => h });
 let fake: Awaited<ReturnType<typeof startFakeDitto>>;
 afterEach(async () => { await fake?.stop(); });
 
+/** A fetch that never answers; it settles only when its signal aborts. */
+const hangingFetch = ((_url: string | URL | Request, init?: RequestInit) =>
+  new Promise<Response>((_res, reject) => {
+    const signal = init!.signal!;
+    if (signal.aborted) return reject(signal.reason);
+    signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+  })) as typeof fetch;
+
 describe("HttpDittoClient", () => {
+  it("gives up on a Ditto that does not answer within the timeout, naming the setting", async () => {
+    // Without it a hung Ditto (or a live message to an unresponsive device) held the tool call,
+    // and the session's open request, until undici's ~300 s headers timeout.
+    const client = new HttpDittoClient("http://ditto", { fetchFn: hangingFetch, timeoutMs: 50 });
+    await expect(client.execute(op({ path: "/things" }), {}, cred()))
+      .rejects.toThrow("ditto did not answer GET /things within 50 ms (ditto.requestTimeoutMs)");
+  });
+
+  it("reports a caller's cancellation as such, not as a timeout", async () => {
+    const client = new HttpDittoClient("http://ditto", { fetchFn: hangingFetch, timeoutMs: 60_000 });
+    const ac = new AbortController();
+    const call = client.execute(op({}), {}, cred(), ac.signal);
+    ac.abort(new Error("cancelled by the client"));
+    await expect(call).rejects.toThrow("cancelled by the client");
+  });
+
   it("substitutes path params, sends query, forwards auth", async () => {
     fake = await startFakeDitto((req) => ({ status: 200, body: JSON.stringify({ ok: req.url }) }));
     const client = new HttpDittoClient(fake.baseUrl);

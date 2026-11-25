@@ -12,6 +12,8 @@
  */
 
 import { describe, it, expect, afterEach } from "vitest";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { makeActionTools, buildVersionUrl } from "./action-tools.js";
 import { HttpDittoClient } from "./client.js";
 import { startFakeDitto } from "./fake-ditto.js";
@@ -176,6 +178,21 @@ describe("makeActionTools", () => {
     const standard = AppConfigSchema.parse({ ditto: { enabled: true, baseUrl: "http://ditto", credential: oidc } });
     await expect(makeActionTools(standard, { loadSpec: async () => SPEC }))
       .rejects.toThrow(/^ditto\.credential: .*missing clientSecret/);
+  });
+
+  it("bounds each Ditto call by ditto.requestTimeoutMs", async () => {
+    const silent = createServer(() => { /* never answers */ });
+    await new Promise<void>((r) => silent.listen(0, "127.0.0.1", r));
+    const baseUrl = `http://127.0.0.1:${(silent.address() as AddressInfo).port}`;
+    try {
+      const config = AppConfigSchema.parse({ ditto: { enabled: true, baseUrl, requestTimeoutMs: 100 } });
+      const [tool] = await makeActionTools(config, { loadSpec: async () => SPEC });
+      await expect(tool.handler({ thingId: "ns:1" }, { config, headers: {} } as never))
+        .rejects.toThrow(/within 100 ms/);
+    } finally {
+      silent.closeAllConnections();
+      await new Promise<void>((r) => silent.close(() => r()));
+    }
   });
 
   it("a sudo tool refuses at call time when no devopsCredential is configured", async () => {

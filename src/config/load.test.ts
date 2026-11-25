@@ -64,6 +64,7 @@ describe("loadConfig", () => {
     expect(cfg.knowledge.localDir).toEqual({ enabled: false, id: "local" });
     expect(cfg.knowledge.publicSource).toEqual({ enabled: true, url: "https://eclipse.dev/ditto/llms.txt" });
     expect(cfg.ditto.credential).toEqual({ kind: "basic" });
+    expect(cfg.ditto.requestTimeoutMs).toBe(70_000);
     expect(cfg.ditto.policy).toEqual({ allowMethods: ["GET"], writeAllowlist: ["PUT /x"], sudoAllowlist: [] });
     expect(cfg.tools).toEqual({ ping: true });
   });

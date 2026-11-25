@@ -130,6 +130,8 @@ export const AppConfigSchema = z
       .object({
         enabled: z.boolean().default(false),
         baseUrl: z.string().optional(),
+        // Above the 60 s Ditto waits at most for a live message response, so Ditto's own 408 wins.
+        requestTimeoutMs: z.number().int().positive().default(70_000),
         openApi: z
           .object({
             path: z.string().optional(),

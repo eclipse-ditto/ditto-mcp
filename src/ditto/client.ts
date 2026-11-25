@@ -28,16 +28,23 @@ export interface DittoClient {
   ): Promise<DittoResponse>;
 }
 
+export interface HttpDittoClientOptions {
+  fetchFn?: typeof fetch;
+  /** Bound on each call, token fetch included; the default matches `ditto.requestTimeoutMs`. */
+  timeoutMs?: number;
+}
+
 export class HttpDittoClient implements DittoClient {
   private readonly baseUrl: string;
+  private readonly fetchFn: typeof fetch;
+  private readonly timeoutMs: number;
 
-  constructor(
-    baseUrl: string,
-    private readonly fetchFn: typeof fetch = fetch,
-  ) {
+  constructor(baseUrl: string, opts: HttpDittoClientOptions = {}) {
     // Operation paths start with "/". Strip rather than use new URL(path, base), which would
     // drop a reverse-proxy prefix such as "https://gw/ditto".
     this.baseUrl = baseUrl.replace(/\/+$/, "");
+    this.fetchFn = opts.fetchFn ?? fetch;
+    this.timeoutMs = opts.timeoutMs ?? 70_000;
   }
 
   async execute(
@@ -67,17 +74,28 @@ export class HttpDittoClient implements DittoClient {
     const url = `${this.baseUrl}${path}${qs ? `?${qs}` : ""}`;
 
     // Set after the params: the server's credential and the declared media type always win.
-    const auth = await credential.authHeader(signal);
-    if (auth) headers["authorization"] = auth;
     let body: string | undefined;
     if (op.hasBody && args.body !== undefined) {
-      const contentType = op.contentType ?? "application/json";
-      headers["content-type"] = contentType;
-      body = encodeBody(args.body, contentType);
+      headers["content-type"] = op.contentType ?? "application/json";
+      body = encodeBody(args.body, headers["content-type"]);
     }
 
-    const res = await this.fetchFn(url, { method: op.method, headers, body, signal });
-    return { status: res.status, body: await res.text() };
+    // Without a bound of our own, a hung Ditto (or a live message to an unresponsive device)
+    // holds the tool call, and its session's open request, until undici's ~300 s headers timeout.
+    const timeout = AbortSignal.timeout(this.timeoutMs);
+    const sig = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    try {
+      const auth = await credential.authHeader(sig);
+      if (auth) headers["authorization"] = auth;
+      const res = await this.fetchFn(url, { method: op.method, headers, body, signal: sig });
+      return { status: res.status, body: await res.text() };
+    } catch (err) {
+      if (!timeout.aborted || signal?.aborted) throw err;
+      throw new Error(
+        `ditto did not answer ${op.method} ${op.path} within ${this.timeoutMs} ms (ditto.requestTimeoutMs)`,
+        { cause: err },
+      );
+    }
   }
 }
 

@@ -396,6 +396,7 @@ The server can expose action tools dynamically generated from a Ditto OpenAPI sp
 |-------|------|---------|-------------|
 | `ditto.enabled` | `boolean` | `false` | Enable action tools |
 | `ditto.baseUrl` | `string` | (required if enabled) | Base URL to Ditto instance (e.g., `http://localhost:8080`) |
+| `ditto.requestTimeoutMs` | `number` | `70000` | Bound on each call to Ditto, including the OIDC token fetch and the wait for a live message response; a call that takes longer fails with an error naming this setting. The default is above the 60 s Ditto waits at most for a message response; raise it if you pass a longer `timeout` to claim messages (up to 600 s) |
 | `ditto.openApi.path` | `string?` | `undefined` | Path to a local OpenAPI spec file. |
 | `ditto.openApi.url` | `string?` | `undefined` | URL to fetch the OpenAPI spec from. |
 | `ditto.openApi.version` | `string?` | `undefined` | Ditto git tag/ref (e.g. `3.6.0`) to fetch the matching spec for, via `versionUrlTemplate`. |
