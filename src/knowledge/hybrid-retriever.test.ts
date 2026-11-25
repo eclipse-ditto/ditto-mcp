@@ -13,26 +13,29 @@
 
 import { describe, it, expect } from "vitest";
 import { HybridRetriever } from "./hybrid-retriever.js";
-import type { Retriever, Chunk, RetrievedChunk } from "./types.js";
+import type { Ranker, Chunk } from "./types.js";
 
 const chunk = (id: string): Chunk => ({
   id, source: "s", title: id, text: id, cite: `https://x/${id}`,
 });
 
-// Fake retrievers returning fixed ranked lists.
-function fixed(kind: string, ids: string[]): Retriever {
-  return {
-    kind,
-    search: async (_q, k): Promise<RetrievedChunk[]> => ids.slice(0, k).map((id) => ({
-      chunk: chunk(id),
-      matchedBy: [kind],
-    })),
-  };
+// Fake legs returning fixed ranked lists.
+function fixed(kind: string, ids: string[]): Ranker {
+  return { rank: async (_q, k) => ids.slice(0, k).map((id) => ({ id, matchedBy: [kind] })) };
 }
+
+// A store that has every chunk and records which ids were loaded.
+const loaded: string[][] = [];
+const store = {
+  getChunks: async (ids: string[]) => {
+    loaded.push(ids);
+    return new Map(ids.map((id) => [id, chunk(id)]));
+  },
+};
 
 describe("HybridRetriever", () => {
   it("has kind 'hybrid'", () => {
-    const h = new HybridRetriever([fixed("fts", ["a"]), fixed("vector", ["b"])]);
+    const h = new HybridRetriever(store, [fixed("fts", ["a"]), fixed("vector", ["b"])]);
     expect(h.kind).toBe("hybrid");
   });
 
@@ -40,7 +43,7 @@ describe("HybridRetriever", () => {
     // 'b' appears in both lists -> should rank at/near the top after fusion.
     const a = fixed("fts", ["a", "b", "c"]);
     const d = fixed("vector", ["b", "d", "e"]);
-    const h = new HybridRetriever([a, d]);
+    const h = new HybridRetriever(store, [a, d]);
     const hits = await h.search("q", 3);
     const ids = hits.map((rc) => rc.chunk.id);
     expect(ids[0]).toBe("b");
@@ -51,17 +54,26 @@ describe("HybridRetriever", () => {
   it("fuses a chunk that both retrievers rank just below the requested count", async () => {
     // Fetching only k candidates per leg dropped 'x' (4th in both lists for k=3) before fusion,
     // although RRF scores it 2/64, above any single-list first place (1/61).
-    const h = new HybridRetriever([fixed("fts", ["a", "b", "c", "x"]), fixed("vector", ["d", "e", "f", "x"])]);
+    const h = new HybridRetriever(store, [fixed("fts", ["a", "b", "c", "x"]), fixed("vector", ["d", "e", "f", "x"])]);
     const hits = await h.search("q", 3);
     expect(hits.map((rc) => rc.chunk.id)).toEqual(["x", "a", "d"]);
     expect(hits[0].matchedBy).toEqual(["fts", "vector"]);
+  });
+
+  it("loads only the fused top k chunks, in one batch", async () => {
+    // Loading every leg's candidates (2 x depth) and then discarding most of them cost one
+    // query per candidate on pgvector.
+    loaded.length = 0;
+    const h = new HybridRetriever(store, [fixed("fts", ["a", "b", "c", "x"]), fixed("vector", ["d", "e", "f", "x"])]);
+    await h.search("q", 3);
+    expect(loaded).toEqual([["x", "a", "d"]]);
   });
 
   it("merges matchedBy from both retrievers for duplicates", async () => {
     // 'b' appears in both lists -> matchedBy should be ["fts","vector"]
     const a = fixed("fts", ["a", "b", "c"]);
     const d = fixed("vector", ["b", "d", "e"]);
-    const h = new HybridRetriever([a, d]);
+    const h = new HybridRetriever(store, [a, d]);
     const hits = await h.search("q", 5);
     const b = hits.find((rc) => rc.chunk.id === "b");
     expect(b).toBeDefined();

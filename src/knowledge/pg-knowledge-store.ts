@@ -192,6 +192,15 @@ export class PgKnowledgeStore implements KnowledgeStore {
     return r.rows[0] as Chunk | undefined;
   }
 
+  async getChunks(ids: string[]): Promise<Map<string, Chunk>> {
+    if (ids.length === 0) return new Map();
+    const r = await this.pool.query(
+      `SELECT id, source, title, text, cite FROM ${this.t}_chunks WHERE id = ANY($1::text[])`,
+      [ids],
+    );
+    return new Map((r.rows as Chunk[]).map((c) => [c.id, c]));
+  }
+
   async ftsSearch(query: string, k: number): Promise<string[]> {
     const tokens = ftsTokens(query);
     if (tokens.length === 0) return [];

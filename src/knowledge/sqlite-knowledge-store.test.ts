@@ -33,6 +33,15 @@ describe("SqliteKnowledgeStore", () => {
     expect(await store.getChunk("missing")).toBeUndefined();
   });
 
+  it("returns many chunks by id in one call, leaving out unknown ids", async () => {
+    store = new SqliteKnowledgeStore();
+    await store.addChunks([chunk("a", "alpha"), chunk("b", "beta"), chunk("c", "gamma")]);
+    const got = await store.getChunks(["c", "missing", "a"]);
+    expect([...got.keys()].sort()).toEqual(["a", "c"]);
+    expect(got.get("c")?.text).toBe("gamma");
+    expect((await store.getChunks([])).size).toBe(0);
+  });
+
   it("keyword-searches via FTS, best match first, honoring k, injection-safe", async () => {
     store = new SqliteKnowledgeStore();
     await store.addChunks([

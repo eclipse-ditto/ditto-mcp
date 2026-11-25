@@ -11,9 +11,9 @@
  * SPDX-License-Identifier: EPL-2.0
  */
 
-import type { RetrievedChunk, Retriever } from "./types.js";
+import type { RankedId, RetrievedChunk, Retriever } from "./types.js";
 import type { EmbeddingProvider } from "./embedding.js";
-import type { KnowledgeStore } from "./knowledge-store.js";
+import { loadRanked, type KnowledgeStore } from "./knowledge-store.js";
 
 export class VectorRetriever implements Retriever {
   readonly kind = "vector";
@@ -22,14 +22,13 @@ export class VectorRetriever implements Retriever {
     private readonly embedder: EmbeddingProvider,
   ) {}
 
-  async search(query: string, k: number): Promise<RetrievedChunk[]> {
+  async rank(query: string, k: number): Promise<RankedId[]> {
     const [vector] = await this.embedder.embed([query]);
     const hits = await this.store.vectorSearch(vector, k);
-    const out: RetrievedChunk[] = [];
-    for (const hit of hits) {
-      const chunk = await this.store.getChunk(hit.id);
-      if (chunk) out.push({ chunk, matchedBy: ["vector"] });
-    }
-    return out;
+    return hits.map((hit) => ({ id: hit.id, matchedBy: ["vector"] }));
+  }
+
+  async search(query: string, k: number): Promise<RetrievedChunk[]> {
+    return loadRanked(this.store, await this.rank(query, k));
   }
 }

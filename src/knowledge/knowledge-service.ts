@@ -77,6 +77,19 @@ export class KnowledgeService {
       });
     });
 
+    // Every neighbor id the walk below may visit, fetched in one query: one per id cost a
+    // sequential round trip each on pgvector. Ids past a boundary are fetched and then unused.
+    const candidates = new Set<string>();
+    for (const anchor of anchors) {
+      const p = parseId(anchor.chunk.id);
+      if (!p) continue;
+      for (let j = -context; j <= context; j++) {
+        const nid = `${p.source}#${p.ord + j}`;
+        if (!recs.has(nid)) candidates.add(nid);
+      }
+    }
+    const fetched = await this.store.getChunks([...candidates]);
+
     for (let rank = 0; rank < anchors.length; rank++) {
       const anchor = anchors[rank];
       const p = parseId(anchor.chunk.id);
@@ -90,7 +103,7 @@ export class KnowledgeService {
             if (rank < existing.rank) existing.rank = rank;
             continue;
           }
-          const c = await this.store.getChunk(nid);
+          const c = fetched.get(nid);
           if (!c || c.cite !== anchor.chunk.cite) break; // boundary or missing
           recs.set(nid, { chunk: c, matchedBy: [], isAnchor: false, rank, ord: p.ord + dir * j });
         }

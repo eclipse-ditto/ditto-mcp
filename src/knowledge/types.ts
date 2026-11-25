@@ -41,8 +41,19 @@ export interface KnowledgeSource {
   loadChunks(signal?: AbortSignal, onSkip?: SkipFn): Promise<Chunk[]>;
 }
 
-/** Indexes chunks and searches them. */
-export interface Retriever {
+/** A match before its chunk is loaded. */
+export interface RankedId {
+  id: string;
+  matchedBy: string[];
+}
+
+/** Ranks chunk ids for a query, best first, without loading the chunks. */
+export interface Ranker {
+  rank(query: string, k: number): Promise<RankedId[]>;
+}
+
+/** Searches the indexed chunks. `rank` lets a caller fuse results before loading any chunk. */
+export interface Retriever extends Ranker {
   readonly kind: string;
   search(query: string, k: number): Promise<RetrievedChunk[]>;
 }

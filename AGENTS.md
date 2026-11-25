@@ -67,8 +67,8 @@ bin/ingest.ts
 | `ditto/client.ts` | `HttpDittoClient.execute()`: builds the URL and headers, guards path and header params, encodes the body, bounds each call by `ditto.requestTimeoutMs` |
 | `ditto/credential.ts` | `DittoCredential`, `createConfigCredential()`, `OidcClientCredential` (client-credentials grant, token cache, shared fetch) |
 | `ditto/fake-ditto.ts`, `ditto/fake-oidc.ts` | Test-only HTTP fakes |
-| `knowledge/types.ts` | `Chunk`, `RetrievedChunk`, `KnowledgeSource`, `Retriever`, `SkipFn`, `SkippedItem` |
-| `knowledge/knowledge-store.ts` | `KnowledgeStore` interface, `IndexMeta`, `SCHEMA_VERSION`, `ftsTokens()` |
+| `knowledge/types.ts` | `Chunk`, `RetrievedChunk`, `RankedId`, `KnowledgeSource`, `Ranker`, `Retriever`, `SkipFn`, `SkippedItem` |
+| `knowledge/knowledge-store.ts` | `KnowledgeStore` interface (`getChunks` batch load), `IndexMeta`, `SCHEMA_VERSION`, `ftsTokens()`, `loadRanked()` |
 | `knowledge/sqlite-knowledge-store.ts` | `SqliteKnowledgeStore`: better-sqlite3 + FTS5 + sqlite-vec |
 | `knowledge/pg-knowledge-store.ts` | `PgKnowledgeStore`: tsvector + pgvector HNSW; `connect`, `lockIngest`, `swapIntoLive`, `copyGrants` |
 | `knowledge/store-factory.ts` | `openStore()`, `importPgStore()`: lazy imports of the native backends |
@@ -76,7 +76,7 @@ bin/ingest.ts
 | `knowledge/build-index.ts` | `buildIndex()`: validates, then writes chunks, vectors, meta; `metaFor()` |
 | `knowledge/build.ts` | `buildKnowledgeService()`: whether to serve the prebuilt index, build in memory, or disable; `watchIndex`, `makeRetriever` |
 | `knowledge/knowledge-service.ts` | `KnowledgeService`: search plus neighbor (context) expansion; `getChunk` |
-| `knowledge/fts-retriever.ts`, `vector-retriever.ts`, `hybrid-retriever.ts` | Retrievers; hybrid fuses with RRF (k=60) |
+| `knowledge/fts-retriever.ts`, `vector-retriever.ts`, `hybrid-retriever.ts` | Retrievers (`rank` ids, `search` loads them in one batch); hybrid fuses ids with RRF (k=60), then loads the top k |
 | `knowledge/chunker.ts` | `chunkMarkdown()`, `docKey()`; defines the chunk id format |
 | `knowledge/embedding.ts` | `EmbeddingProvider`, `LocalEmbeddings` (Transformers.js / ONNX), `toBatches()` |
 | `knowledge/factories.ts` | `makeSources()`, `makeEmbedder()` (lazy import) |

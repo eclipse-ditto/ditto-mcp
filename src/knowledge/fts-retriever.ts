@@ -11,20 +11,18 @@
  * SPDX-License-Identifier: EPL-2.0
  */
 
-import type { RetrievedChunk, Retriever } from "./types.js";
-import type { KnowledgeStore } from "./knowledge-store.js";
+import type { RankedId, RetrievedChunk, Retriever } from "./types.js";
+import { loadRanked, type KnowledgeStore } from "./knowledge-store.js";
 
 export class FtsRetriever implements Retriever {
   readonly kind = "fts";
   constructor(private readonly store: KnowledgeStore) {}
 
+  async rank(query: string, k: number): Promise<RankedId[]> {
+    return (await this.store.ftsSearch(query, k)).map((id) => ({ id, matchedBy: ["fts"] }));
+  }
+
   async search(query: string, k: number): Promise<RetrievedChunk[]> {
-    const ids = await this.store.ftsSearch(query, k);
-    const out: RetrievedChunk[] = [];
-    for (const id of ids) {
-      const chunk = await this.store.getChunk(id);
-      if (chunk) out.push({ chunk, matchedBy: ["fts"] });
-    }
-    return out;
+    return loadRanked(this.store, await this.rank(query, k));
   }
 }

@@ -67,6 +67,15 @@ export class SqliteKnowledgeStore implements KnowledgeStore {
     return r;
   }
 
+  async getChunks(ids: string[]): Promise<Map<string, Chunk>> {
+    if (ids.length === 0) return new Map();
+    // One bound JSON array instead of a placeholder per id (SQLite caps the number of variables).
+    const rows = this.db
+      .prepare("SELECT id, source, title, text, cite FROM chunks WHERE id IN (SELECT value FROM json_each(?))")
+      .all(JSON.stringify(ids)) as Chunk[];
+    return new Map(rows.map((r) => [r.id, r]));
+  }
+
   async ftsSearch(query: string, k: number): Promise<string[]> {
     const match = toMatchQuery(query);
     if (match === "") return [];

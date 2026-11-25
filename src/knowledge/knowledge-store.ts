@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: EPL-2.0
  */
 
-import type { Chunk } from "./types.js";
+import type { Chunk, RankedId, RetrievedChunk } from "./types.js";
 
 export const SCHEMA_VERSION = 1;
 
@@ -33,6 +33,8 @@ export interface IndexMeta {
 export interface KnowledgeStore {
   addChunks(chunks: Chunk[]): Promise<void>;
   getChunk(id: string): Promise<Chunk | undefined>;
+  /** The chunks with these ids, in one query; unknown ids are left out. */
+  getChunks(ids: string[]): Promise<Map<string, Chunk>>;
   ftsSearch(query: string, k: number): Promise<string[]>;
   ensureVectorTable(dim: number): Promise<void>;
   upsertVectors(items: { id: string; vector: number[] }[]): Promise<void>;
@@ -43,4 +45,19 @@ export interface KnowledgeStore {
   getMeta(): Promise<IndexMeta | undefined>;
   reset(): Promise<void>;
   close(): Promise<void>;
+}
+
+/**
+ * Load the chunks of ranked matches in one batch, keeping their order. One query per chunk cost
+ * a sequential round trip each on pgvector.
+ */
+export async function loadRanked(
+  store: Pick<KnowledgeStore, "getChunks">,
+  ranked: RankedId[],
+): Promise<RetrievedChunk[]> {
+  const chunks = await store.getChunks(ranked.map((r) => r.id));
+  return ranked.flatMap((r) => {
+    const chunk = chunks.get(r.id);
+    return chunk ? [{ chunk, matchedBy: r.matchedBy }] : [];
+  });
 }

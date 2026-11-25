@@ -40,6 +40,16 @@ describe("PgKnowledgeStore", () => {
     await s.close();
   });
 
+  it("getChunks returns many chunks by id in one query, leaving out unknown ids", async () => {
+    const s = await fresh();
+    await s.addChunks([chunk("a", "alpha"), chunk("b", "beta"), chunk("c", "gamma")]);
+    const got = await s.getChunks(["c", "missing", "a"]);
+    expect([...got.keys()].sort()).toEqual(["a", "c"]);
+    expect(got.get("c")?.text).toBe("gamma");
+    expect((await s.getChunks([])).size).toBe(0);
+    await s.close();
+  });
+
   it("ftsSearch ranks keyword matches", async () => {
     const s = await fresh();
     await s.addChunks([chunk("a", "netty leak out of memory crash"), chunk("b", "policy access control")]);

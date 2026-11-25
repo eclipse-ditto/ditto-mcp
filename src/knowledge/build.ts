@@ -176,5 +176,5 @@ function makeRetriever(config: AppConfig, store: KnowledgeStore, embedder?: Embe
   if (!embedder) throw new Error("vector/hybrid retriever requires an embedder");
   const vector = new VectorRetriever(store, embedder);
   if (kind === "vector") return vector;
-  return new HybridRetriever([new FtsRetriever(store), vector]);
+  return new HybridRetriever(store, [new FtsRetriever(store), vector]);
 }
