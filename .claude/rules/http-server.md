@@ -30,7 +30,7 @@ paths:
 
 ## SessionTable invariants (`session-table.ts`)
 - sessions − doomed + pending ≤ `maxSessions` at all times, even with concurrent initializes.
-- Eviction picks the least recently active idle session. Failing that, it picks a busy session inactive for longer than `sessionIdleTimeoutMs` (a stream to a client that vanished). A busy session that was recently active is never evicted.
+- Eviction picks the least recently active idle session, but only if it has gone without a request for at least `sessionEvictionMinIdleMs`. Failing that, it picks a busy session inactive for longer than `sessionIdleTimeoutMs` (a stream to a client that vanished). A recently used session is never evicted, idle or busy: a Streamable HTTP client has no request open between calls, and evicting it makes it re-initialize and evict the next one, so sessions would churn. The newcomer gets 503 instead.
 - `sweep()` runs on an `unref`ed interval of min(idle timeout, 60 s) and closes idle sessions past the timeout.
 - `settle` is idempotent, so `release` after `add` is a no-op. `close` ignores a session that is already gone.
 - The clock is injected (`now`). Never call `Date.now()` directly inside the class.

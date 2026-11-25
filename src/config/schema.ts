@@ -55,6 +55,7 @@ export const AppConfigSchema = z
             allowedHosts: z.array(z.string()).optional(),
             allowedOrigins: z.array(z.string()).optional(),
             sessionIdleTimeoutMs: z.number().int().positive().default(30 * 60_000),
+            sessionEvictionMinIdleMs: z.number().int().min(0).default(5 * 60_000),
             maxSessions: z.number().int().positive().default(100),
             auth: HttpAuthSchema,
           })

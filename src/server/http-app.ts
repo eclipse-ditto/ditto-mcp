@@ -106,8 +106,12 @@ export function createHttpApp(
 
   app.use(express.json());
 
-  const { sessionIdleTimeoutMs, maxSessions } = config.server.http;
-  const sessions = new SessionTable<StreamableHTTPServerTransport>(maxSessions, sessionIdleTimeoutMs);
+  const { sessionIdleTimeoutMs, sessionEvictionMinIdleMs, maxSessions } = config.server.http;
+  const sessions = new SessionTable<StreamableHTTPServerTransport>(
+    maxSessions,
+    sessionIdleTimeoutMs,
+    sessionEvictionMinIdleMs,
+  );
 
   // Count a request against its session; the session is idle again once the response closes.
   const track = (session: Session<StreamableHTTPServerTransport>, res: Response): void => {

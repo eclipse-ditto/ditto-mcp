@@ -26,9 +26,10 @@ function fakeTransport(table: () => SessionTable<{ close(): Promise<void> }>, id
   return t;
 }
 
-function setup(maxSessions: number, idleTimeoutMs = 1000) {
+function setup(maxSessions: number, idleTimeoutMs = 1000, evictionMinIdleMs = 0) {
   let now = 0;
-  const table: SessionTable<{ close(): Promise<void> }> = new SessionTable(maxSessions, idleTimeoutMs, () => now);
+  const table: SessionTable<{ close(): Promise<void> }> =
+    new SessionTable(maxSessions, idleTimeoutMs, evictionMinIdleMs, () => now);
   const open = (id: string) => {
     const reservation = table.reserve();
     if (!reservation) throw new Error(`no room for ${id}`);
@@ -66,6 +67,17 @@ describe("SessionTable", () => {
     expect(b.transport.closed).toBe(true);
     expect(table.get("b")).toBeUndefined();
     expect(table.get("a")).toBeDefined();
+  });
+
+  it("at the cap, refuses rather than replace an idle session used within the eviction minimum", () => {
+    // Between calls a Streamable HTTP client has no request open. Replacing it would make it
+    // re-initialize and push out the next one: more active clients than the cap would churn.
+    const { table, open, advance } = setup(1, 1000, 100);
+    open("a");
+    advance(99);
+    expect(table.reserve()).toBeUndefined();
+    advance(1);
+    expect(table.reserve()).toBeDefined();
   });
 
   it("refuses to add a session whose reservation was already released", () => {

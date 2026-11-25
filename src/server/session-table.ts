@@ -44,6 +44,8 @@ export class SessionTable<T extends { close(): Promise<void> }> {
   constructor(
     private readonly maxSessions: number,
     private readonly idleTimeoutMs: number,
+    /** How long an idle session must go without a request before a newcomer may replace it. */
+    private readonly evictionMinIdleMs: number,
     private readonly now: () => number = Date.now,
   ) {}
 
@@ -124,14 +126,18 @@ export class SessionTable<T extends { close(): Promise<void> }> {
     void session.transport.close();
   }
 
-  // The least recently active idle session, however recently it was used, else a busy one
-  // inactive for longer than the idle timeout (a stream to a vanished client may never close).
-  // A busy session that was recently active is never replaced.
+  // The least recently active idle session, if it has gone without a request for at least
+  // evictionMinIdleMs, else a busy one inactive for longer than the idle timeout (a stream to a
+  // vanished client may never close). A recently used session is never replaced: a Streamable HTTP
+  // client has no request open between calls, and closing it makes it re-initialize and push out
+  // the next one, so more active clients than the cap would churn each other. The newcomer gets
+  // 503 instead.
   private evictionCandidate(): Session<T> | undefined {
-    const cutoff = this.now() - this.idleTimeoutMs;
+    const now = this.now();
     const byAge = [...this.sessions.values()]
       .filter((s) => !this.doomed.has(s))
       .sort((a, b) => a.lastActive - b.lastActive);
-    return byAge.find((s) => s.openRequests === 0) ?? byAge.find((s) => s.lastActive < cutoff);
+    return byAge.find((s) => s.openRequests === 0 && now - s.lastActive >= this.evictionMinIdleMs) ??
+      byAge.find((s) => s.lastActive < now - this.idleTimeoutMs);
   }
 }

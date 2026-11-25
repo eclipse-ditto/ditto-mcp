@@ -296,14 +296,26 @@ describe("session lifetime", () => {
   });
 
   it("at maxSessions, closes the least recently active idle session to admit a new one", async () => {
-    const { server, url } = await listen({ maxSessions: 2 });
+    const { server, url } = await listen({ maxSessions: 2, sessionEvictionMinIdleMs: 100 });
     const a = await initSession(url);
     const b = await initSession(url);
+    await sleep(150);
     expect(await pingStatus(url, a)).toBe(200); // b is now the least recently active
     const c = await initSession(url);
     expect(await pingStatus(url, b)).toBe(404);
     expect(await pingStatus(url, a)).toBe(200);
     expect(await pingStatus(url, c)).toBe(200);
+    await new Promise<void>((r) => server.close(() => r()));
+  });
+
+  it("at maxSessions, refuses a new initialize with 503 rather than close a recently used idle session", async () => {
+    // A client that only POSTs is idle between calls; closing it would make it re-initialize
+    // and close the next one.
+    const { server, url } = await listen({ maxSessions: 1 });
+    const a = await initSession(url);
+    const res = await fetch(url, { method: "POST", headers: MCP_HEADERS, body: INITIALIZE });
+    expect(res.status).toBe(503);
+    expect(await pingStatus(url, a)).toBe(200);
     await new Promise<void>((r) => server.close(() => r()));
   });
 
@@ -332,7 +344,8 @@ describe("session lifetime", () => {
 
   it("does not evict a session for an initialize that DNS-rebinding protection rejects", async () => {
     // The derived allowlist holds the configured port (3000), whatever port we really bound.
-    const { server, url } = await listen({ enableDnsRebindingProtection: true, maxSessions: 1 });
+    // No eviction minimum, so the rejected initialize really holds a reservation that would close the session.
+    const { server, url } = await listen({ enableDnsRebindingProtection: true, maxSessions: 1, sessionEvictionMinIdleMs: 0 });
     const ping = JSON.stringify({ jsonrpc: "2.0", id: 2, method: "ping" });
     const { sessionId } = await postWithHost(url, "127.0.0.1:3000", INITIALIZE);
     expect((await postWithHost(url, "attacker.example", INITIALIZE)).status).toBe(403);
