@@ -12,6 +12,8 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
+import { createServer, type ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
 import { PublicSource } from "./public-source.js";
 import type { Chunk } from "./types.js";
 
@@ -188,5 +190,70 @@ describe("PublicSource", () => {
     const ids = (cs: Chunk[]) => cs.filter((c) => c.cite.endsWith("policies.md")).map((c) => c.id);
     expect(ids(after)).toEqual(ids(before));
     expect(ids(before).length).toBeGreaterThan(0);
+  });
+
+  describe("default fetch: 5 MB response cap", () => {
+    // Serves an llms.txt linking /doc.md, answered by `doc`. Uses the real fetch (no fetchFn),
+    // on loopback only.
+    async function serve(doc: (res: ServerResponse) => void) {
+      const server = createServer((req, res) => {
+        if (req.url === "/llms.txt") res.end("- [Doc](/doc.md)\n");
+        else doc(res);
+      });
+      await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+      const { port } = server.address() as AddressInfo;
+      const stop = () => {
+        server.closeAllConnections();
+        return new Promise<void>((r) => server.close(() => r()));
+      };
+      return { url: `http://127.0.0.1:${port}/llms.txt`, stop };
+    }
+
+    async function skippedReasons(url: string): Promise<string[]> {
+      const reasons: string[] = [];
+      await expect(new PublicSource({ url }).loadChunks(undefined, (_item, reason) => reasons.push(reason)))
+        .resolves.toEqual([]);
+      return reasons;
+    }
+
+    it("refuses a body declared larger than the cap without reading it", async () => {
+      const srv = await serve((res) => {
+        res.writeHead(200, { "content-length": String(6_000_000) });
+        res.write("# never finished");
+      });
+      try {
+        expect(await skippedReasons(srv.url)).toEqual([expect.stringMatching(/response too large/)]);
+      } finally { await srv.stop(); }
+    });
+
+    it("stops reading a body that grows past the cap", async () => {
+      // An endless chunked body: buffering it whole would run into the 15 s timeout (or OOM)
+      // before any length check.
+      const srv = await serve((res) => {
+        const piece = "x".repeat(64 * 1024);
+        const pump = () => { while (res.write(piece)); };
+        res.on("drain", pump);
+        pump();
+      });
+      try {
+        expect(await skippedReasons(srv.url)).toEqual([expect.stringMatching(/response too large/)]);
+      } finally { await srv.stop(); }
+    }, 10_000);
+
+    it("counts bytes, not characters", async () => {
+      // 3 M two-byte characters: under the cap as a string length, 6 MB on the wire.
+      const srv = await serve((res) => res.end("é".repeat(3_000_000)));
+      try {
+        expect(await skippedReasons(srv.url)).toEqual([expect.stringMatching(/response too large/)]);
+      } finally { await srv.stop(); }
+    });
+
+    it("reads a body under the cap", async () => {
+      const srv = await serve((res) => res.end("# Doc\n\nCafé crème."));
+      try {
+        const chunks = await new PublicSource({ url: srv.url }).loadChunks();
+        expect(chunks.map((c) => c.text).join("")).toContain("Café crème.");
+      } finally { await srv.stop(); }
+    });
   });
 });

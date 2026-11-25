@@ -37,7 +37,7 @@ The server holds powerful credentials. `ditto.devopsCredential` reaches `/devops
 - Never log credentials or tokens. OIDC errors name the token URL and the status code, nothing else.
 
 ## Knowledge inputs
-- `PublicSource` follows only `http:`/`https:` links ending in `.md` or `.markdown` (against SSRF and corpus pollution), caps each response at 5 MB, and times out after 15 s.
+- `PublicSource` follows only `http:`/`https:` links ending in `.md` or `.markdown` (against SSRF and corpus pollution), caps each response at 5 MB, and times out after 15 s. The cap counts bytes while the body streams in (a larger `Content-Length` is refused up front); never buffer the body with `res.text()` before checking it.
 - The pgvector table prefix is interpolated into SQL, so it is validated (`^[A-Za-z_][A-Za-z0-9_]*$`, at most 40 chars). Every value goes in as a `$n` parameter. Identifiers read from the catalog go through `escapeIdentifier` or `quote_ident`.
 
 ## Secrets and the image

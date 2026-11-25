@@ -29,17 +29,43 @@ interface Entry {
   url: string;
 }
 
+const MAX_RESPONSE_BYTES = 5_000_000;
+
 const defaultFetch: FetchFn = async (url, signal) => {
   const timeout = AbortSignal.timeout(15000);
   const sig = signal ? AbortSignal.any([signal, timeout]) : timeout;
   const res = await fetch(url, { signal: sig });
   if (!res.ok) throw new Error(`fetch ${url} -> ${res.status}`);
-  const text = await res.text();
-  if (text.length > 5_000_000) {
-    throw new Error(`fetch ${url} -> response too large (${text.length} bytes)`);
-  }
-  return text;
+  return readCapped(res, url);
 };
+
+/**
+ * Read a body of at most MAX_RESPONSE_BYTES. Checked while reading: res.text() buffers the whole
+ * body before a length check can run, so one huge document linked from llms.txt could exhaust
+ * memory at startup. Bytes are counted, not UTF-16 code units.
+ */
+async function readCapped(res: Response, url: string): Promise<string> {
+  const tooLarge = () => new Error(`fetch ${url} -> response too large (over ${MAX_RESPONSE_BYTES} bytes)`);
+  if (Number(res.headers.get("content-length")) > MAX_RESPONSE_BYTES) {
+    await res.body?.cancel().catch(() => undefined);
+    throw tooLarge();
+  }
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_RESPONSE_BYTES) {
+      await reader.cancel().catch(() => undefined);
+      throw tooLarge();
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks, total));
+}
 
 export class PublicSource implements KnowledgeSource {
   readonly id = "public";
