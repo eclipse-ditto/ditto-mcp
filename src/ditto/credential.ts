@@ -84,9 +84,12 @@ function untilAborted<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> 
 /** Build a credential from a single credential-config object (standard or devops slot). */
 export function createConfigCredential(c: CredentialConfig, fetchFn: typeof fetch = fetch): DittoCredential {
   if (c.kind === "oidc") {
+    // Throw rather than send no credential: in the devops slot that would still register the
+    // sudo tools and call Ditto unauthenticated instead of refusing them. The usual cause is a
+    // secret that was never templated into the config.
     if (!c.tokenUrl || !c.clientId || !c.clientSecret) {
-      process.stderr.write("[ditto-mcp] oidc credential missing tokenUrl/clientId/clientSecret; using no credential\n");
-      return new StaticCredential(undefined);
+      const missing = (["tokenUrl", "clientId", "clientSecret"] as const).filter((k) => !c[k]);
+      throw new Error(`kind "oidc" requires tokenUrl, clientId and clientSecret; missing ${missing.join(", ")}`);
     }
     return new OidcClientCredential(
       { tokenUrl: c.tokenUrl, clientId: c.clientId, clientSecret: c.clientSecret, scope: c.scope },

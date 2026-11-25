@@ -417,6 +417,8 @@ Action tools support two credential modes:
 - `clientSecret` (required) — OAuth2 client secret (never logged)
 - `scope` (optional) — OAuth2 scopes (space-separated)
 
+An `oidc` credential missing `tokenUrl`, `clientId` or `clientSecret` (e.g. a secret that was never templated into the config) stops the server at startup with a `fatal:` error naming the key; it is never replaced by sending no credential.
+
 Example:
 ```json
 {

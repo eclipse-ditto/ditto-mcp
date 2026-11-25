@@ -116,7 +116,7 @@ Outside `src/`:
 
 1. Never write to stdout: in stdio mode it carries the MCP frames. Log with `process.stderr.write("[ditto-mcp] ...\n")` (`[ditto-mcp ingest]` in the ingest CLI). Don't use `console.*`.
 2. Ditto only ever sees the server's own identity: `ditto.credential`, or `ditto.devopsCredential` for sudo operations. Caller headers are never forwarded to Ditto and never pick the credential.
-3. Fail closed. These stop startup: `auth.mode: "none"` on a non-loopback host; `ditto.enabled` without a `baseUrl`; a spec that can't be loaded. Knowledge problems never stop startup: the server logs them and serves without the knowledge tools.
+3. Fail closed. These stop startup: `auth.mode: "none"` on a non-loopback host; `ditto.enabled` without a `baseUrl`; an `oidc` credential missing `tokenUrl`, `clientId` or `clientSecret`; a spec that can't be loaded. Knowledge problems never stop startup: the server logs them and serves without the knowledge tools.
 4. The tool registry is built once at startup and shared. Only the `McpServer` and its transport are created per HTTP session.
 5. Ingest never writes a partial or empty index. A failed ingest leaves the live index untouched.
 6. Chunk ids `${source}:${sha256(cite)[0..12]}#${ordinal}` are a contract. `get_chunk` after a re-ingest and neighbor expansion both depend on the format.

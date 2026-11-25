@@ -42,7 +42,7 @@ An allowlist entry is either an operationId or `"METHOD /raw/spec/{path}"`, with
 
 ## Credentials (`credential.ts`)
 - `basic` sends a static `Authorization: Basic ...` header. Without a username, no header is sent.
-- `oidc` uses `OidcClientCredential`: a client_credentials grant with HTTP Basic client authentication. The token is cached until `expires_in` minus 30 s; concurrent callers share one in-flight fetch, which times out after 15 s. If tokenUrl, clientId, or clientSecret is missing, it logs a warning and sends no credential.
+- `oidc` uses `OidcClientCredential`: a client_credentials grant with HTTP Basic client authentication. The token is cached until `expires_in` minus 30 s; concurrent callers share one in-flight fetch, which times out after 15 s. If tokenUrl, clientId, or clientSecret is missing, `createConfigCredential` throws and `makeActionTools` stops startup, naming the key (`ditto.credential` or `ditto.devopsCredential`). Falling back to no credential would let the devops slot send sudo calls unauthenticated.
 
 ## Bundled spec
 `openapi/ditto-api-2.yml` is Ditto's spec, verbatim, and is not checked in. `openapi/ditto-spec.json` pins the Ditto git ref and the file's sha256; `scripts/fetch-ditto-spec.mjs` (`npm run fetch-spec`) downloads it and refuses any other hash. The `pretest`, `prebuild`, `predev:stdio` and `predev:http` hooks run it, and so does the Docker builder through `npm run build`. Never commit the yml or edit it by hand. To move to another Ditto release, follow `openapi/README.md`, then re-run `ditto/bundled-spec.test.ts` and check the README tool-name examples still match.

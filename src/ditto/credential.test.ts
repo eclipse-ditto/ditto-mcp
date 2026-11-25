@@ -30,6 +30,14 @@ describe("credentials", () => {
     expect(await c.authHeader()).toBeUndefined();
   });
 
+  it("refuses an oidc credential missing tokenUrl, clientId or clientSecret", () => {
+    // A secret that was never templated into the config must not turn into "send no credential".
+    expect(() => createConfigCredential(cred({ kind: "oidc", tokenUrl: "https://idp/token", clientId: "c" })))
+      .toThrow(/requires tokenUrl, clientId and clientSecret.*missing clientSecret/);
+    expect(() => createConfigCredential(cred({ kind: "oidc" })))
+      .toThrow(/missing tokenUrl, clientId, clientSecret/);
+  });
+
   it("oidc fetches a bearer token and caches it (one token call for two uses)", async () => {
     const oidc = await startFakeOidc({ access_token: "tok123", expires_in: 3600 });
     try {

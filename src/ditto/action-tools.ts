@@ -15,14 +15,14 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import YAML from "yaml";
-import type { AppConfig } from "../config/schema.js";
+import type { AppConfig, CredentialConfig } from "../config/schema.js";
 import type { ToolDef } from "../core/types.js";
 import type { DittoClient } from "./client.js";
 import { HttpDittoClient } from "./client.js";
 import { parseOperations } from "./openapi.js";
 import { isAllowed } from "./tool-policy.js";
 import { MAX_TOOL_NAME, operationToTool, type ToolCredentials } from "./action-tool.js";
-import { createConfigCredential } from "./credential.js";
+import { createConfigCredential, type DittoCredential } from "./credential.js";
 import { errorReason } from "../knowledge/ingest-error.js";
 
 export interface ActionToolDeps {
@@ -67,6 +67,14 @@ async function defaultLoadSpec(config: AppConfig): Promise<unknown> {
   return YAML.parse(await readFile(BUNDLED_SPEC_PATH, "utf8"));
 }
 
+function configCredential(key: string, c: CredentialConfig): DittoCredential {
+  try {
+    return createConfigCredential(c);
+  } catch (err) {
+    throw new Error(`${key}: ${errorReason(err)}`, { cause: err });
+  }
+}
+
 export async function makeActionTools(config: AppConfig, deps: ActionToolDeps = {}): Promise<ToolDef[]> {
   const client =
     deps.client ??
@@ -91,8 +99,8 @@ export async function makeActionTools(config: AppConfig, deps: ActionToolDeps = 
     );
   }
   const creds: ToolCredentials = {
-    standard: createConfigCredential(config.ditto.credential),
-    devops: dc ? createConfigCredential(dc) : undefined,
+    standard: configCredential("ditto.credential", config.ditto.credential),
+    devops: dc ? configCredential("ditto.devopsCredential", dc) : undefined,
   };
   const tools = parseOperations(spec)
     .filter((op) => isAllowed(op, config.ditto.policy))

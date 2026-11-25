@@ -164,6 +164,20 @@ describe("makeActionTools", () => {
     await expect(makeActionTools(config, { loadSpec: async () => SPEC })).rejects.toThrow(/ditto\.baseUrl/);
   });
 
+  it("fails, naming the key, when an oidc credential is incomplete", async () => {
+    // Falling back to no credential would still fill the devops slot, so the sudo tools would
+    // reach Ditto unauthenticated instead of being refused.
+    const oidc = { kind: "oidc", tokenUrl: "https://idp/token", clientId: "devops" };
+    const devops = AppConfigSchema.parse({
+      ditto: { enabled: true, baseUrl: "http://ditto", devopsCredential: oidc, policy: { sudoAllowlist: ["sudoRetrieveThing"] } },
+    });
+    await expect(makeActionTools(devops, { loadSpec: async () => SPEC }))
+      .rejects.toThrow(/^ditto\.devopsCredential: .*missing clientSecret/);
+    const standard = AppConfigSchema.parse({ ditto: { enabled: true, baseUrl: "http://ditto", credential: oidc } });
+    await expect(makeActionTools(standard, { loadSpec: async () => SPEC }))
+      .rejects.toThrow(/^ditto\.credential: .*missing clientSecret/);
+  });
+
   it("a sudo tool refuses at call time when no devopsCredential is configured", async () => {
     const { byName, config } = await tools({ allowMethods: ["GET"], writeAllowlist: [], sudoAllowlist: ["sudoRetrieveThing"] });
     const res = await byName.ditto_sudoRetrieveThing.handler({ thingId: "ns:1" }, { config, headers: {} } as never);
