@@ -27,10 +27,17 @@ import { makeSources, makeEmbedder, type FactoryDeps } from "./factories.js";
 
 export type KnowledgeDeps = FactoryDeps;
 
+/**
+ * Whether the index holds what the configured retriever reads. Every index has the chunks and
+ * their FTS data, so any index serves `fts`; `vector` and `hybrid` need embeddings from the
+ * configured model and dim, which vector and hybrid indexes have. Requiring the same retriever
+ * made an fts server rebuild a hybrid index's corpus in memory at every start (failing offline),
+ * and disabled knowledge outright on pgvector.
+ */
 function metaMatches(meta: IndexMeta | null | undefined, config: AppConfig): boolean {
   if (!meta || meta.complete !== true || meta.schemaVersion !== SCHEMA_VERSION) return false;
-  if (meta.retriever !== config.knowledge.retriever) return false;
   if (config.knowledge.retriever === "fts") return true;
+  if (meta.retriever === "fts") return false;
   const e = config.knowledge.embedding;
   return meta.embeddingModel === e.model && meta.embeddingDim === e.dim;
 }
@@ -44,8 +51,9 @@ function describeMeta(meta: Pick<IndexMeta, "retriever" | "embeddingModel" | "em
  * An ingest swaps a new pgvector index in while the server runs, and every query reads the
  * swapped tables. So before each search, compare the stored meta with the last one seen, and
  * when it changed, check it against the config again, as at startup. While it doesn't match
- * (embedded with another model or dim, or built for another retriever), searches are refused
- * with the reason. A matching index always has the vector table its retriever needs.
+ * (embedded with another model or dim, or without the embeddings a vector or hybrid retriever
+ * needs), searches are refused with the reason. A matching index always has the vector table its
+ * retriever needs.
  */
 function watchIndex(store: KnowledgeStore, config: AppConfig, meta: IndexMeta | undefined): () => Promise<void> {
   let seen = JSON.stringify(meta ?? null);

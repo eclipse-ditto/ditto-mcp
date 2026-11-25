@@ -20,7 +20,7 @@ The format is `${source}:${docKey(cite)}#${ordinal}`: `docKey` is the first 12 h
 Sources keep their order deterministic. `PublicSource` keeps llms.txt order (fetching 8 at a time, placing results by index) and drops repeated URLs, keeping the first. `LocalDirSource` sorts the files it walks and drops repeated files.
 
 ## Index metadata
-`IndexMeta` is `{ schemaVersion, retriever, embeddingModel?, embeddingDim?, complete }`. `metaMatches` in `build.ts` accepts an index only if it is complete, has the current `SCHEMA_VERSION` and the configured retriever, and, for vector or hybrid, the configured model and dim. Bump `SCHEMA_VERSION` (`knowledge-store.ts`) whenever the stored layout or the id format changes; an old index is then rebuilt or refused instead of serving wrong data.
+`IndexMeta` is `{ schemaVersion, retriever, embeddingModel?, embeddingDim?, complete }`. `metaMatches` in `build.ts` accepts an index only if it is complete, has the current `SCHEMA_VERSION`, and holds what the configured retriever reads. Every index has the chunks and their FTS data, so any index serves `fts`; `vector` and `hybrid` need an index built for `vector` or `hybrid` (the only ones with embeddings) with the configured model and dim. If a future layout drops FTS data from some index, `metaMatches` must check for it. Bump `SCHEMA_VERSION` (`knowledge-store.ts`) whenever the stored layout or the id format changes; an old index is then rebuilt or refused instead of serving wrong data.
 
 ## Server startup (`buildKnowledgeService` in `build.ts`)
 This never fails startup. On any error it logs and returns `undefined`, and the knowledge tools are not registered.

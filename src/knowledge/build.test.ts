@@ -243,6 +243,36 @@ describe("buildKnowledgeService — prebuilt sqlite file", () => {
     expect(svc).toBeUndefined();
   });
 
+  it("serves a prebuilt index whose stored data covers the configured retriever", async () => {
+    // Every index holds the chunks' FTS data; vector and hybrid indexes also hold embeddings.
+    // Refusing a superset made an fts server re-download the corpus at every start (failing
+    // offline), and disabled knowledge outright on pgvector.
+    const { SqliteKnowledgeStore } = await import("./sqlite-knowledge-store.js");
+    const { buildIndex } = await import("./build-index.js");
+    const fake3 = { dim: 3, embed: async (t: string[]) => t.map(() => [1, 0, 0]) };
+    const prebuilt = async (retriever: "fts" | "vector" | "hybrid") => {
+      const path = join(mkdtempSync(join(tmpdir(), "ditto-idx-")), "index.db");
+      const w = new SqliteKnowledgeStore(path);
+      const embedder = retriever === "fts" ? undefined : fake3;
+      await buildIndex([{ id: "s", loadChunks: async () => [
+        { id: "s:a#0", source: "s", title: "T", text: "netty out of memory", cite: "x" }] }], w, embedder,
+        { retriever, embeddingModel: embedder && "fake/model", embeddingDim: embedder?.dim });
+      await w.close();
+      return path;
+    };
+    // No sources: a rebuild would find nothing, so a defined service means the file was served.
+    const serve = async (retriever: "fts" | "vector" | "hybrid", path: string) => buildKnowledgeService(
+      AppConfigSchema.parse({ knowledge: { retriever, embedding: { model: "fake/model", dim: 3 },
+        publicSource: { enabled: false }, localDir: { enabled: false }, store: { kind: "sqlite", sqlite: { path } } } }),
+      { embeddingProvider: fake3 },
+    );
+    for (const [configured, index] of [["fts", "hybrid"], ["fts", "vector"], ["vector", "hybrid"], ["hybrid", "vector"]] as const) {
+      const svc = await serve(configured, await prebuilt(index));
+      expect(svc, `${configured} server, ${index} index`).toBeDefined();
+      expect((await svc!.search("out of memory", 5))[0].chunk.text).toContain("out of memory");
+    }
+  });
+
   it("falls back to in-memory build when the store path is a corrupt file", async () => {
     const dir = mkdtempSync(join(tmpdir(), "ditto-idx-"));
     const path = join(dir, "index.db");

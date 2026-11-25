@@ -69,6 +69,18 @@ describe("pgvector end-to-end", () => {
     expect(hits[0].matchedBy.length).toBeGreaterThan(0);
   });
 
+  it("an fts server serves a hybrid index, which holds everything fts needs", async () => {
+    const table = `cover_${Math.floor(performance.now())}`;
+    await withIngestStore(cfg(table), async (store) => {
+      await buildIndex([src], store, fake, metaFor(cfg(table), fake));
+    });
+    const ftsOnly = cfg(table);
+    ftsOnly.knowledge.retriever = "fts";
+    const svc = await buildKnowledgeService(ftsOnly);
+    expect(svc).toBeDefined();
+    expect((await svc!.search("memory", 2))[0].chunk.text.toLowerCase()).toContain("out of memory");
+  });
+
   it("never-built pg store → buildKnowledgeService returns undefined (no auto-write)", async () => {
     const table = `empty_${Math.floor(performance.now())}`;
     const svc = await buildKnowledgeService(cfg(table), { embeddingProvider: fake });
