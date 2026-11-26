@@ -44,8 +44,13 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
+      # onnxruntime-node's install script would download CUDA/TensorRT providers
+      # from GitHub on linux/x64, outside the lockfile; inference is CPU-only,
+      # and a missing download fails the install (same as in the Dockerfile)
       - name: Install npm dependencies
         run: npm ci
+        env:
+          ONNXRUNTIME_NODE_INSTALL_CUDA: skip
       - name: Typecheck
         run: npm run typecheck
       - name: Run tests

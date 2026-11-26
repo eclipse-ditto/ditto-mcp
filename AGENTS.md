@@ -17,7 +17,7 @@ There are three processes: `stdio` (local use), `http` (production, Docker), and
 
 | Task | Command |
 |---|---|
-| Install | `npm ci` |
+| Install | `ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci` (skips onnxruntime's CUDA download from GitHub, which fails the install when unavailable) |
 | Typecheck | `npm run typecheck` |
 | Unit tests (hermetic: no network, no Docker) | `npm test` |
 | Fetch the bundled Ditto spec (`npm test`, `build`, `dev:stdio`, `dev:http` run it first) | `npm run fetch-spec` |

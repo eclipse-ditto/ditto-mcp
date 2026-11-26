@@ -17,9 +17,11 @@ Model Context Protocol (MCP) server for Eclipse Ditto. Provides two classes of t
 ```bash
 git clone https://github.com/eclipse-ditto/ditto-mcp.git
 cd ditto-mcp/
-npm ci
+ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci
 npm run build
 ```
+
+`ONNXRUNTIME_NODE_INSTALL_CUDA=skip` stops onnxruntime-node's install script from downloading CUDA/TensorRT providers from GitHub on linux/x64. Embedding runs on the CPU and doesn't need them, and when that download fails, the whole install fails.
 
 `npm run build` first downloads Ditto's OpenAPI spec at the pinned release (see [Ditto Action Tools](#ditto-action-tools)); it needs access to raw.githubusercontent.com once.
 
