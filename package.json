@@ -32,7 +32,7 @@
     "@huggingface/transformers": "^3.8.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^11.10.0",
-    "express": "^4.21.2",
+    "express": "^4.22.3",
     "pg": "^8.22.0",
     "sqlite-vec": "^0.1.9",
     "yaml": "^2.9.0",
