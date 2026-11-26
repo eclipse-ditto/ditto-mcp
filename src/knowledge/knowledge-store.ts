@@ -1,0 +1,63 @@
+/*
+ * Copyright (c) 2026 Contributors to the Eclipse Foundation
+ *
+ * See the NOTICE file(s) distributed with this work for additional
+ * information regarding copyright ownership.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * http://www.eclipse.org/legal/epl-2.0
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ */
+
+import type { Chunk, RankedId, RetrievedChunk } from "./types.js";
+
+export const SCHEMA_VERSION = 1;
+
+/** The word tokens of free text, for keyword (FTS) search. */
+export function ftsTokens(query: string): string[] {
+  return query.match(/[\p{L}\p{N}]+/gu) ?? [];
+}
+
+export interface IndexMeta {
+  schemaVersion: number;
+  retriever: string;
+  embeddingModel?: string;
+  embeddingDim?: number;
+  complete: boolean;
+}
+
+/** Holds chunks, a keyword (FTS) index, and vectors. Backend-agnostic
+ *  (SqliteKnowledgeStore now; PgKnowledgeStore in P2c). */
+export interface KnowledgeStore {
+  addChunks(chunks: Chunk[]): Promise<void>;
+  getChunk(id: string): Promise<Chunk | undefined>;
+  /** The chunks with these ids, in one query; unknown ids are left out. */
+  getChunks(ids: string[]): Promise<Map<string, Chunk>>;
+  ftsSearch(query: string, k: number): Promise<string[]>;
+  ensureVectorTable(dim: number): Promise<void>;
+  upsertVectors(items: { id: string; vector: number[] }[]): Promise<void>;
+  vectorSearch(vector: number[], k: number): Promise<{ id: string; distance: number }[]>;
+  isPopulated(): Promise<boolean>;
+  hasVectors(): Promise<boolean>;
+  setMeta(meta: IndexMeta): Promise<void>;
+  getMeta(): Promise<IndexMeta | undefined>;
+  reset(): Promise<void>;
+  close(): Promise<void>;
+}
+
+/**
+ * Load the chunks of ranked matches in one batch, keeping their order. One query per chunk cost
+ * a sequential round trip each on pgvector.
+ */
+export async function loadRanked(
+  store: Pick<KnowledgeStore, "getChunks">,
+  ranked: RankedId[],
+): Promise<RetrievedChunk[]> {
+  const chunks = await store.getChunks(ranked.map((r) => r.id));
+  return ranked.flatMap((r) => {
+    const chunk = chunks.get(r.id);
+    return chunk ? [{ chunk, matchedBy: r.matchedBy }] : [];
+  });
+}

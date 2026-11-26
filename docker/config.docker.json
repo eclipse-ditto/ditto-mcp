@@ -1,0 +1,17 @@
+{
+  "server": {
+    "name": "ditto-mcp",
+    "http": {
+      "host": "0.0.0.0",
+      "port": 3000,
+      "enableDnsRebindingProtection": true,
+      "allowedHosts": ["localhost:3000", "127.0.0.1:3000"],
+      "auth": { "mode": "bearer", "tokenFile": "/run/secrets/mcp-token" }
+    }
+  },
+  "knowledge": {
+    "enabled": true,
+    "retriever": "fts",
+    "store": { "kind": "sqlite", "sqlite": { "path": "/app/data/ditto_kn.db" } }
+  }
+}
