@@ -29,7 +29,7 @@
     "dev:ingest": "tsx src/bin/ingest.ts"
   },
   "dependencies": {
-    "@huggingface/transformers": "^3.8.1",
+    "@huggingface/transformers": "^4.3.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^11.10.0",
     "express": "^4.21.2",
