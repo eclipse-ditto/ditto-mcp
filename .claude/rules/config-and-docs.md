@@ -26,7 +26,7 @@ paths:
 ## Docker (`Dockerfile`)
 - The base image is `node:22-slim`, pinned by its multi-arch digest (`ARG NODE_IMAGE`), with no `--platform` pin. It must stay Debian-based, never alpine: onnxruntime-node has no musl build.
 - Build steps: `ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci`, then `npm run build` (whose `prebuild` hook fetches the pinned Ditto spec, so the builder copies `scripts/` and `openapi/` first), then `npm prune --omit=dev`.
-- The runtime stage copies only `node_modules`, `dist`, `package.json`, `openapi/ditto-api-2.yml` (from the builder), and `docker/config.docker.json` (to `/app/config.docker.json`). A new runtime file outside `dist/` needs its own `COPY` here, and must not be excluded in `.dockerignore`.
+- The runtime stage copies only `node_modules`, `dist`, `package.json`, `openapi/ditto-api-2.yml` (from the builder), `docker/config.docker.json` (to `/app/config.docker.json`), and the legal files `LICENSE` and `NOTICE.md`, which must ship with every distribution. A new runtime file outside `dist/` needs its own `COPY` here, and must not be excluded in `.dockerignore`.
 - The container runs as `ditto` (uid 10001), with a `/app/data` volume for the SQLite index.
 
 ## Dependencies and versions

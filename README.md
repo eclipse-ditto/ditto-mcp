@@ -596,3 +596,9 @@ All examples use placeholders (e.g., `REPLACE_ME`, `/path/to/...`) for secrets a
 - `sqlite-vec` — SQLite vector extension
 - `@huggingface/transformers` — ONNX embedding models
 - `yaml` — OpenAPI spec parsing
+
+## Contributing, Security and License
+
+- Contributions are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md). This project follows the Eclipse Foundation [Community Code of Conduct](CODE_OF_CONDUCT.md).
+- Please report vulnerabilities through coordinated disclosure, as described in [SECURITY.md](SECURITY.md), not through public issues.
+- Eclipse Ditto MCP is part of the [Eclipse Ditto](https://eclipse.dev/ditto) project and is licensed under the [Eclipse Public License 2.0](LICENSE). See [NOTICE.md](NOTICE.md) for copyright, trademark and third-party information.

@@ -62,6 +62,9 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./package.json
 
+# Legal documentation: the license and notice files must ship with every distribution.
+COPY LICENSE NOTICE.md ./
+
 # Bundled Ditto OpenAPI spec (fetched by the builder): the offline fallback for
 # action tools when ditto.openApi sets none of path/url/version. Resolved as
 # <pkg root>/openapi/.
